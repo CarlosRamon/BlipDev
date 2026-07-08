@@ -1,0 +1,344 @@
+package br.com.bliqbrasil.totem.ui.screens.cpfinput
+
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardCapitalization
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import br.com.bliqbrasil.totem.ui.components.OutlineButton
+import br.com.bliqbrasil.totem.ui.components.PrimaryButton
+import br.com.bliqbrasil.totem.ui.screens.cpfinput.CpfInputViewModel.Companion.maskCpf
+import br.com.bliqbrasil.totem.ui.screens.cpfinput.CpfInputViewModel.Companion.maskTelefone
+import br.com.bliqbrasil.totem.ui.screens.cpfinput.CpfInputViewModel.Companion.validarCpf
+import br.com.bliqbrasil.totem.ui.theme.*
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun CpfInputScreen(
+    viewModel: CpfInputViewModel,
+    onBack: () -> Unit,
+    onContinue: (clienteId: String) -> Unit,
+) {
+    val state by viewModel.state.collectAsStateWithLifecycle()
+
+    if (state.step == CpfStep.CONSENT) {
+        ConsentDialog(
+            onAccept = viewModel::aceitarConsentimento,
+            onDecline = { onContinue("") },
+        )
+    }
+
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("Identificação", fontFamily = FugazOne) },
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Voltar", tint = Surface)
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = Primary, titleContentColor = Surface),
+            )
+        },
+        containerColor = Background,
+    ) { padding ->
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .padding(horizontal = 24.dp),
+            contentAlignment = Alignment.TopCenter,
+        ) {
+            when (state.step) {
+                CpfStep.CONSENT -> {}
+                CpfStep.ENTERING_CPF, CpfStep.LOADING -> EnteringCpfContent(state, viewModel, onSkip = { onContinue("") })
+                CpfStep.FOUND -> FoundContent(state, onContinue = { onContinue(state.clienteEncontrado!!.id) }, onSkip = { onContinue("") })
+                CpfStep.NOT_FOUND, CpfStep.REGISTERING -> NotFoundContent(state, viewModel, onSuccess = onContinue, onSkip = { onContinue("") })
+            }
+        }
+    }
+}
+
+@Composable
+private fun ConsentDialog(onAccept: () -> Unit, onDecline: () -> Unit) {
+    Dialog(
+        onDismissRequest = {},
+        properties = DialogProperties(dismissOnBackPress = false, dismissOnClickOutside = false),
+    ) {
+        Card(
+            shape = RoundedCornerShape(20.dp),
+            elevation = CardDefaults.cardElevation(8.dp),
+            colors = CardDefaults.cardColors(containerColor = Surface),
+        ) {
+            Column(
+                modifier = Modifier.padding(28.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+            ) {
+                Text("🔒", fontSize = 40.sp, modifier = Modifier.align(Alignment.CenterHorizontally))
+                Text(
+                    "Autorização de uso de dados",
+                    fontFamily = FugazOne,
+                    fontSize = 22.sp,
+                    color = OnSurface,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Surface(
+                    color = PrimaryLight,
+                    shape = RoundedCornerShape(10.dp),
+                ) {
+                    Text(
+                        text = "Para personalizar sua experiência e agilizar futuras visitas, " +
+                            "gostaríamos de registrar seu CPF, nome e telefone.\n\n" +
+                            "Seus dados são armazenados com segurança e utilizados exclusivamente " +
+                            "para histórico de uso neste estabelecimento, conforme a Lei Geral de " +
+                            "Proteção de Dados (LGPD — Lei 13.709/2018).",
+                        fontFamily = Epilogue,
+                        fontSize = 14.sp,
+                        color = Secondary,
+                        lineHeight = 21.sp,
+                        modifier = Modifier.padding(14.dp),
+                    )
+                }
+                PrimaryButton(label = "Autorizar e continuar", onClick = onAccept)
+                OutlineButton(label = "Continuar sem identificação", onClick = onDecline)
+            }
+        }
+    }
+}
+
+@Composable
+private fun EnteringCpfContent(
+    state: CpfInputViewModel.UiState,
+    viewModel: CpfInputViewModel,
+    onSkip: () -> Unit,
+) {
+    val keyboard = LocalSoftwareKeyboardController.current
+    val focusRequester = remember { FocusRequester() }
+
+    LaunchedEffect(Unit) { focusRequester.requestFocus() }
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .verticalScroll(rememberScrollState())
+            .padding(top = 40.dp),
+        verticalArrangement = Arrangement.spacedBy(24.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Text("Digite seu CPF", fontFamily = FugazOne, fontSize = 28.sp, color = OnSurface)
+        Text(
+            "Identificamos sua conta para agilizar o atendimento",
+            fontFamily = Epilogue,
+            fontSize = 15.sp,
+            color = Secondary,
+            textAlign = TextAlign.Center,
+            lineHeight = 22.sp,
+        )
+
+        Card(
+            shape = RoundedCornerShape(16.dp),
+            elevation = CardDefaults.cardElevation(2.dp),
+            colors = CardDefaults.cardColors(containerColor = Surface),
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Column(modifier = Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("CPF", fontFamily = Epilogue, fontWeight = FontWeight.SemiBold, fontSize = 13.sp, color = Secondary, letterSpacing = 0.5.sp)
+                OutlinedTextField(
+                    value = maskCpf(state.cpf),
+                    onValueChange = { viewModel.updateCpf(it) },
+                    placeholder = { Text("000.000.000-00", fontFamily = Epilogue, color = Tertiary) },
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Done),
+                    keyboardActions = KeyboardActions(onDone = { keyboard?.hide() }),
+                    modifier = Modifier.fillMaxWidth().focusRequester(focusRequester),
+                    shape = RoundedCornerShape(10.dp),
+                    isError = state.cpf.length == 11 && !validarCpf(state.cpf),
+                    supportingText = if (state.cpf.length == 11 && !validarCpf(state.cpf)) {
+                        { Text("CPF inválido", fontFamily = Epilogue, color = Error) }
+                    } else null,
+                )
+            }
+        }
+
+        if (state.step == CpfStep.LOADING) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                CircularProgressIndicator(color = Primary, modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+                Text("Buscando cadastro...", fontFamily = Epilogue, fontSize = 14.sp, color = Secondary)
+            }
+        }
+
+        Spacer(Modifier.height(8.dp))
+        OutlineButton(label = "Pular identificação", onClick = onSkip)
+    }
+}
+
+@Composable
+private fun FoundContent(
+    state: CpfInputViewModel.UiState,
+    onContinue: () -> Unit,
+    onSkip: () -> Unit,
+) {
+    val cliente = state.clienteEncontrado ?: return
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 48.dp),
+        verticalArrangement = Arrangement.spacedBy(24.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Box(
+            modifier = Modifier
+                .size(80.dp)
+                .background(SuccessLight, RoundedCornerShape(40.dp)),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text("✓", fontSize = 36.sp, color = Success)
+        }
+
+        Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text("Bem-vindo de volta!", fontFamily = FugazOne, fontSize = 26.sp, color = OnSurface)
+            Text(cliente.nome, fontFamily = Epilogue, fontSize = 20.sp, fontWeight = FontWeight.SemiBold, color = Primary)
+            Text(maskCpf(cliente.cpf), fontFamily = Epilogue, fontSize = 15.sp, color = Secondary)
+        }
+
+        Spacer(Modifier.height(16.dp))
+        PrimaryButton(label = "Continuar", onClick = onContinue)
+        OutlineButton(label = "Não sou eu", onClick = onSkip)
+    }
+}
+
+@Composable
+private fun NotFoundContent(
+    state: CpfInputViewModel.UiState,
+    viewModel: CpfInputViewModel,
+    onSuccess: (clienteId: String) -> Unit,
+    onSkip: () -> Unit,
+) {
+    val keyboard = LocalSoftwareKeyboardController.current
+    val isRegistering = state.step == CpfStep.REGISTERING
+    val canSubmit = state.nome.trim().length >= 2 && state.telefone.length >= 10 && !isRegistering
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .verticalScroll(rememberScrollState())
+            .padding(top = 32.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
+    ) {
+        Text("Novo cadastro", fontFamily = FugazOne, fontSize = 26.sp, color = OnSurface)
+        Text(
+            "CPF não encontrado. Preencha seus dados para se cadastrar.",
+            fontFamily = Epilogue,
+            fontSize = 14.sp,
+            color = Secondary,
+            lineHeight = 21.sp,
+        )
+
+        Card(
+            shape = RoundedCornerShape(16.dp),
+            elevation = CardDefaults.cardElevation(2.dp),
+            colors = CardDefaults.cardColors(containerColor = Surface),
+        ) {
+            Column(modifier = Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                LabeledField(
+                    label = "CPF",
+                    value = maskCpf(state.cpf),
+                    enabled = false,
+                )
+                LabeledField(
+                    label = "NOME COMPLETO *",
+                    value = state.nome,
+                    onValueChange = viewModel::updateNome,
+                    placeholder = "Seu nome",
+                    keyboardType = KeyboardType.Text,
+                    capitalization = KeyboardCapitalization.Words,
+                    imeAction = ImeAction.Next,
+                )
+                LabeledField(
+                    label = "TELEFONE *",
+                    value = maskTelefone(state.telefone),
+                    onValueChange = { viewModel.updateTelefone(it) },
+                    placeholder = "(00) 00000-0000",
+                    keyboardType = KeyboardType.Phone,
+                    imeAction = ImeAction.Done,
+                    keyboardActions = KeyboardActions(onDone = { keyboard?.hide() }),
+                )
+            }
+        }
+
+        if (state.error != null) {
+            Surface(color = ErrorSurface, shape = RoundedCornerShape(8.dp)) {
+                Text(
+                    state.error,
+                    fontFamily = Epilogue,
+                    color = Error,
+                    fontSize = 14.sp,
+                    modifier = Modifier.padding(12.dp).fillMaxWidth(),
+                    textAlign = TextAlign.Center,
+                )
+            }
+        }
+
+        PrimaryButton(
+            label = "Cadastrar e continuar",
+            onClick = { viewModel.cadastrar(onSuccess) },
+            enabled = canSubmit,
+            loading = isRegistering,
+        )
+        OutlineButton(label = "Pular identificação", onClick = onSkip, enabled = !isRegistering)
+    }
+}
+
+@Composable
+private fun LabeledField(
+    label: String,
+    value: String,
+    onValueChange: (String) -> Unit = {},
+    placeholder: String = "",
+    enabled: Boolean = true,
+    keyboardType: KeyboardType = KeyboardType.Text,
+    capitalization: KeyboardCapitalization = KeyboardCapitalization.None,
+    imeAction: ImeAction = ImeAction.Next,
+    keyboardActions: KeyboardActions = KeyboardActions.Default,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Text(label, fontFamily = Epilogue, fontWeight = FontWeight.SemiBold, fontSize = 12.sp, color = Secondary, letterSpacing = 0.5.sp)
+        OutlinedTextField(
+            value = value,
+            onValueChange = onValueChange,
+            placeholder = { Text(placeholder, fontFamily = Epilogue, color = Tertiary) },
+            enabled = enabled,
+            singleLine = true,
+            keyboardOptions = KeyboardOptions(keyboardType = keyboardType, capitalization = capitalization, imeAction = imeAction),
+            keyboardActions = keyboardActions,
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(10.dp),
+        )
+    }
+}

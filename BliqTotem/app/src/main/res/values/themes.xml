@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Base theme required by the Activity window before Compose takes over -->
+    <style name="Theme.BliqTotem" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:statusBarColor">#1A73E8</item>
+    </style>
+
+    <style name="Theme.BliqTotem.Splash" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:statusBarColor">#4A8FFE</item>
+        <item name="android:navigationBarColor">#4A8FFE</item>
+        <item name="android:windowBackground">#4A8FFE</item>
+    </style>
+</resources>
