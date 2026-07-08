@@ -16,10 +16,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.OffsetMapping
+import androidx.compose.ui.text.input.TransformedText
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -29,9 +33,74 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import br.com.bliqbrasil.totem.ui.components.OutlineButton
 import br.com.bliqbrasil.totem.ui.components.PrimaryButton
 import br.com.bliqbrasil.totem.ui.screens.cpfinput.CpfInputViewModel.Companion.maskCpf
-import br.com.bliqbrasil.totem.ui.screens.cpfinput.CpfInputViewModel.Companion.maskTelefone
 import br.com.bliqbrasil.totem.ui.screens.cpfinput.CpfInputViewModel.Companion.validarCpf
 import br.com.bliqbrasil.totem.ui.theme.*
+
+// ── Visual transformations ─────────────────────────────────────────────────────
+
+private class CpfVisualTransformation : VisualTransformation {
+    override fun filter(text: AnnotatedString): TransformedText {
+        val digits = text.text
+        val masked = buildString {
+            digits.forEachIndexed { i, c ->
+                if (i == 3 || i == 6) append('.')
+                if (i == 9) append('-')
+                append(c)
+            }
+        }
+        val mapping = object : OffsetMapping {
+            // '.' at original offset 3 and 6; '-' at offset 9
+            override fun originalToTransformed(offset: Int): Int = when {
+                offset <= 2 -> offset
+                offset <= 5 -> minOf(offset + 1, masked.length)
+                offset <= 8 -> minOf(offset + 2, masked.length)
+                else        -> minOf(offset + 3, masked.length)
+            }
+            override fun transformedToOriginal(offset: Int): Int {
+                var digits = 0
+                for (i in 0 until minOf(offset, masked.length)) {
+                    if (masked[i].isDigit()) digits++
+                }
+                return digits
+            }
+        }
+        return TransformedText(AnnotatedString(masked), mapping)
+    }
+}
+
+private class TelefoneVisualTransformation : VisualTransformation {
+    override fun filter(text: AnnotatedString): TransformedText {
+        val digits = text.text
+        // Format: (XX) XXXXX-XXXX — celular 11 dígitos
+        val masked = buildString {
+            if (digits.isEmpty()) return@buildString
+            append('(')
+            digits.forEachIndexed { i, c ->
+                if (i == 2) append(") ")
+                if (i == 7) append('-')
+                append(c)
+            }
+        }
+        val mapping = object : OffsetMapping {
+            // '(' antes do d[0]; ')' e ' ' entre d[1] e d[2]; '-' entre d[6] e d[7]
+            override fun originalToTransformed(offset: Int): Int = when {
+                offset <= 1 -> minOf(offset + 1, masked.length)
+                offset <= 6 -> minOf(offset + 3, masked.length)
+                else        -> minOf(offset + 4, masked.length)
+            }
+            override fun transformedToOriginal(offset: Int): Int {
+                var digits = 0
+                for (i in 0 until minOf(offset, masked.length)) {
+                    if (masked[i].isDigit()) digits++
+                }
+                return digits
+            }
+        }
+        return TransformedText(AnnotatedString(masked), mapping)
+    }
+}
+
+// ── Screen ────────────────────────────────────────────────────────────────────
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -72,9 +141,12 @@ fun CpfInputScreen(
         ) {
             when (state.step) {
                 CpfStep.CONSENT -> {}
-                CpfStep.ENTERING_CPF, CpfStep.LOADING -> EnteringCpfContent(state, viewModel, onSkip = { onContinue("") })
-                CpfStep.FOUND -> FoundContent(state, onContinue = { onContinue(state.clienteEncontrado!!.id) }, onSkip = { onContinue("") })
-                CpfStep.NOT_FOUND, CpfStep.REGISTERING -> NotFoundContent(state, viewModel, onSuccess = onContinue, onSkip = { onContinue("") })
+                CpfStep.ENTERING_CPF, CpfStep.LOADING ->
+                    EnteringCpfContent(state, viewModel, onSkip = { onContinue("") })
+                CpfStep.FOUND ->
+                    FoundContent(state, onContinue = { onContinue(state.clienteEncontrado!!.id) }, onSkip = { onContinue("") })
+                CpfStep.NOT_FOUND, CpfStep.REGISTERING ->
+                    NotFoundContent(state, viewModel, onSuccess = onContinue, onSkip = { onContinue("") })
             }
         }
     }
@@ -104,10 +176,7 @@ private fun ConsentDialog(onAccept: () -> Unit, onDecline: () -> Unit) {
                     textAlign = TextAlign.Center,
                     modifier = Modifier.fillMaxWidth(),
                 )
-                Surface(
-                    color = PrimaryLight,
-                    shape = RoundedCornerShape(10.dp),
-                ) {
+                Surface(color = PrimaryLight, shape = RoundedCornerShape(10.dp)) {
                     Text(
                         text = "Para personalizar sua experiência e agilizar futuras visitas, " +
                             "gostaríamos de registrar seu CPF, nome e telefone.\n\n" +
@@ -164,15 +233,28 @@ private fun EnteringCpfContent(
             modifier = Modifier.fillMaxWidth(),
         ) {
             Column(modifier = Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("CPF", fontFamily = Epilogue, fontWeight = FontWeight.SemiBold, fontSize = 13.sp, color = Secondary, letterSpacing = 0.5.sp)
+                Text(
+                    "CPF",
+                    fontFamily = Epilogue,
+                    fontWeight = FontWeight.SemiBold,
+                    fontSize = 13.sp,
+                    color = Secondary,
+                    letterSpacing = 0.5.sp,
+                )
                 OutlinedTextField(
-                    value = maskCpf(state.cpf),
+                    value = state.cpf,
                     onValueChange = { viewModel.updateCpf(it) },
+                    visualTransformation = CpfVisualTransformation(),
                     placeholder = { Text("000.000.000-00", fontFamily = Epilogue, color = Tertiary) },
                     singleLine = true,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Done),
+                    keyboardOptions = KeyboardOptions(
+                        keyboardType = KeyboardType.Number,
+                        imeAction = ImeAction.Done,
+                    ),
                     keyboardActions = KeyboardActions(onDone = { keyboard?.hide() }),
-                    modifier = Modifier.fillMaxWidth().focusRequester(focusRequester),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .focusRequester(focusRequester),
                     shape = RoundedCornerShape(10.dp),
                     isError = state.cpf.length == 11 && !validarCpf(state.cpf),
                     supportingText = if (state.cpf.length == 11 && !validarCpf(state.cpf)) {
@@ -221,7 +303,10 @@ private fun FoundContent(
             Text("✓", fontSize = 36.sp, color = Success)
         }
 
-        Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
             Text("Bem-vindo de volta!", fontFamily = FugazOne, fontSize = 26.sp, color = OnSurface)
             Text(cliente.nome, fontFamily = Epilogue, fontSize = 20.sp, fontWeight = FontWeight.SemiBold, color = Primary)
             Text(maskCpf(cliente.cpf), fontFamily = Epilogue, fontSize = 15.sp, color = Secondary)
@@ -266,11 +351,8 @@ private fun NotFoundContent(
             colors = CardDefaults.cardColors(containerColor = Surface),
         ) {
             Column(modifier = Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                LabeledField(
-                    label = "CPF",
-                    value = maskCpf(state.cpf),
-                    enabled = false,
-                )
+                // CPF desabilitado: sem cursor, pode usar valor mascarado diretamente
+                LabeledField(label = "CPF", value = maskCpf(state.cpf), enabled = false)
                 LabeledField(
                     label = "NOME COMPLETO *",
                     value = state.nome,
@@ -282,12 +364,13 @@ private fun NotFoundContent(
                 )
                 LabeledField(
                     label = "TELEFONE *",
-                    value = maskTelefone(state.telefone),
+                    value = state.telefone,
                     onValueChange = { viewModel.updateTelefone(it) },
                     placeholder = "(00) 00000-0000",
                     keyboardType = KeyboardType.Phone,
                     imeAction = ImeAction.Done,
                     keyboardActions = KeyboardActions(onDone = { keyboard?.hide() }),
+                    visualTransformation = TelefoneVisualTransformation(),
                 )
             }
         }
@@ -299,7 +382,9 @@ private fun NotFoundContent(
                     fontFamily = Epilogue,
                     color = Error,
                     fontSize = 14.sp,
-                    modifier = Modifier.padding(12.dp).fillMaxWidth(),
+                    modifier = Modifier
+                        .padding(12.dp)
+                        .fillMaxWidth(),
                     textAlign = TextAlign.Center,
                 )
             }
@@ -326,16 +411,29 @@ private fun LabeledField(
     capitalization: KeyboardCapitalization = KeyboardCapitalization.None,
     imeAction: ImeAction = ImeAction.Next,
     keyboardActions: KeyboardActions = KeyboardActions.Default,
+    visualTransformation: VisualTransformation = VisualTransformation.None,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        Text(label, fontFamily = Epilogue, fontWeight = FontWeight.SemiBold, fontSize = 12.sp, color = Secondary, letterSpacing = 0.5.sp)
+        Text(
+            label,
+            fontFamily = Epilogue,
+            fontWeight = FontWeight.SemiBold,
+            fontSize = 12.sp,
+            color = Secondary,
+            letterSpacing = 0.5.sp,
+        )
         OutlinedTextField(
             value = value,
             onValueChange = onValueChange,
             placeholder = { Text(placeholder, fontFamily = Epilogue, color = Tertiary) },
             enabled = enabled,
             singleLine = true,
-            keyboardOptions = KeyboardOptions(keyboardType = keyboardType, capitalization = capitalization, imeAction = imeAction),
+            visualTransformation = visualTransformation,
+            keyboardOptions = KeyboardOptions(
+                keyboardType = keyboardType,
+                capitalization = capitalization,
+                imeAction = imeAction,
+            ),
             keyboardActions = keyboardActions,
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(10.dp),

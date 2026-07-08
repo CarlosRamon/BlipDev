@@ -123,7 +123,7 @@ class SessionViewModel(
             while (!ended.get()) {
                 delay(5_000)
                 val s = _state.value
-                if (!s.sessionStarted || s.activeMachine == null || s.isEnding) continue
+                if (ended.get() || !s.sessionStarted || s.activeMachine == null || s.isEnding) continue
                 if (bleManager.status.value != ConnectionStatus.CONNECTED) continue
                 try {
                     val seconds = maxOf(1, s.remaining)
@@ -199,7 +199,6 @@ class SessionViewModel(
             )
         }
 
-        _state.update { it.copy(isEnding = false) }
         onFinished()
     }
 

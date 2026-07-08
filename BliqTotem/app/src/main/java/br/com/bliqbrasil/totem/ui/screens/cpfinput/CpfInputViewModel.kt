@@ -105,16 +105,6 @@ class CpfInputViewModel(private val repository: PosRepository) : ViewModel() {
             }
         }
 
-        fun maskTelefone(digits: String): String = buildString {
-            if (digits.isEmpty()) return ""
-            append('(')
-            digits.forEachIndexed { i, c ->
-                if (i == 2) append(") ")
-                if (i == (if (digits.length == 11) 7 else 6)) append('-')
-                append(c)
-            }
-        }
-
         private fun toTitleCase(s: String): String =
             s.lowercase().split(" ").joinToString(" ") { it.replaceFirstChar(Char::uppercaseChar) }
 
