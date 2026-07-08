@@ -33,10 +33,6 @@ android {
         buildConfigField("boolean", "STONE_ENABLED", "true")
         buildConfigField("String", "STONE_CODE",
             "\"${prop("stone.code", "STONE_CODE")}\"")
-        buildConfigField("String", "STONE_QRCODE_PROVIDER_ID",
-            "\"${prop("stone.qrcode.providerId", "STONE_QRCODE_PROVIDER_ID")}\"")
-        buildConfigField("String", "STONE_QRCODE_AUTHORIZATION",
-            "\"${prop("stone.qrcode.authorization", "STONE_QRCODE_AUTHORIZATION")}\"")
     }
 
     signingConfigs {
@@ -87,9 +83,16 @@ android {
         release {
             isMinifyEnabled = false
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+            buildConfigField("String", "STONE_QRCODE_PROVIDER_ID",
+                "\"${prop("stone.qrcode.providerId.prod", "STONE_QRCODE_PROVIDER_ID_PROD")}\"")
+            buildConfigField("String", "STONE_QRCODE_AUTHORIZATION",
+                "\"${prop("stone.qrcode.authorization.prod", "STONE_QRCODE_AUTHORIZATION_PROD")}\"")
         }
         debug {
-            // usa o debug keystore padrão do Android (gerado automaticamente)
+            buildConfigField("String", "STONE_QRCODE_PROVIDER_ID",
+                "\"${prop("stone.qrcode.providerId.staging", "STONE_QRCODE_PROVIDER_ID_STAGING")}\"")
+            buildConfigField("String", "STONE_QRCODE_AUTHORIZATION",
+                "\"${prop("stone.qrcode.authorization.staging", "STONE_QRCODE_AUTHORIZATION_STAGING")}\"")
         }
     }
 

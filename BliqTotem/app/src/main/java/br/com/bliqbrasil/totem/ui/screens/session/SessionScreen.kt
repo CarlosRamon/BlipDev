@@ -77,12 +77,14 @@ fun SessionScreen(
             item {
                 val timerColor = when {
                     !state.sessionStarted  -> Tertiary
+                    state.isPaused         -> Warning
                     state.remaining <= 60  -> Error
                     state.remaining <= 180 -> Warning
                     else                   -> Primary
                 }
                 val timerLabel = when {
                     state.isEnding        -> "Encerrando..."
+                    state.isPaused        -> "Sessão pausada"
                     !state.sessionStarted -> "Aguardando início"
                     else                  -> "Tempo restante"
                 }
@@ -129,6 +131,21 @@ fun SessionScreen(
                                 )
                             }
                         }
+                    }
+                }
+            }
+
+            if (state.isPaused) {
+                item {
+                    Surface(color = WarningLight, shape = RoundedCornerShape(12.dp)) {
+                        Text(
+                            "Conexão com o CLP perdida. Aguardando reconexão — selecione o equipamento para retomar.",
+                            fontFamily = Epilogue,
+                            fontSize = 13.sp,
+                            color = Warning,
+                            lineHeight = 20.sp,
+                            modifier = Modifier.fillMaxWidth().padding(14.dp),
+                        )
                     }
                 }
             }

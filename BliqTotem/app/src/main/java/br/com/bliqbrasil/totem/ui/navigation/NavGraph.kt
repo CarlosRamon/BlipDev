@@ -51,7 +51,7 @@ fun NavGraph(navController: NavHostController, app: BliqTotemApp) {
 
         composable<AppDestinations.Home> {
             val vm = viewModel<HomeViewModel>(
-                factory = HomeViewModel.factory(app.repository, app.bleManager, app.tokenStorage)
+                factory = HomeViewModel.factory(app, app.repository, app.bleManager, app.tokenStorage)
             )
             HomeScreen(
                 viewModel = vm,
@@ -151,7 +151,7 @@ fun NavGraph(navController: NavHostController, app: BliqTotemApp) {
                             boxTipo            = route.boxTipo,
                             clienteId          = clienteId,
                         )
-                    )
+                    ) { popUpTo(AppDestinations.CpfInput::class) { inclusive = true } }
                 }
             )
         }

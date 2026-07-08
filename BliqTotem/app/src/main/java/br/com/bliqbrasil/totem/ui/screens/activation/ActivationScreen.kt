@@ -1,6 +1,9 @@
 package br.com.bliqbrasil.totem.ui.screens.activation
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
@@ -9,6 +12,8 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.res.painterResource
+import br.com.bliqbrasil.totem.R
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -35,24 +40,25 @@ fun ActivationScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .padding(32.dp),
+            .imePadding(),
         contentAlignment = Alignment.Center,
     ) {
         Column(
+            modifier = Modifier
+                .verticalScroll(rememberScrollState())
+                .padding(32.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(24.dp),
         ) {
             // Header
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                Text("🚗", fontSize = 64.sp)
-                Text(
-                    text = "Bliq Totem",
-                    fontSize = 30.sp,
-                    fontFamily = FugazOne,
-                    color = OnSurface,
+                Image(
+                    painter = painterResource(R.drawable.bliq_tagline),
+                    contentDescription = "Bliq",
+                    modifier = Modifier.fillMaxWidth(0.6f),
                 )
                 Text(
                     text = "Digite o código de ativação\ngerado no painel da franqueadora",
@@ -113,14 +119,6 @@ fun ActivationScreen(
                         }),
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(10.dp),
-                    )
-                    Text(
-                        text = "8 caracteres — válido por 2 horas",
-                        fontSize = 12.sp,
-                        fontFamily = Epilogue,
-                        color = Tertiary,
-                        textAlign = TextAlign.Center,
-                        modifier = Modifier.fillMaxWidth(),
                     )
                     if (state.error != null) {
                         Surface(

@@ -110,6 +110,17 @@ data class TelemetriaRequest(
     val dados: Map<String, Any?>? = null,
 )
 
+data class HeartbeatRequest(
+    val bleStatus: String,
+    val networkType: String,
+    val signalStrength: Int?,
+    val appVersion: String,
+)
+
+data class HeartbeatResponse(
+    val ciclo: CicloAtivo?,
+)
+
 // ── Internal / navigation models ───────────────────────────────────────────
 
 @Serializable

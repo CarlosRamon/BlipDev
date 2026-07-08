@@ -38,4 +38,7 @@ interface ApiService {
 
     @POST("/api/pos/telemetria")
     suspend fun registrarTelemetria(@Body request: TelemetriaRequest): Response<Unit>
+
+    @POST("/api/pos/heartbeat")
+    suspend fun heartbeat(@Body request: HeartbeatRequest): HeartbeatResponse
 }

@@ -11,8 +11,11 @@ import android.util.Log
 import androidx.core.content.ContextCompat
 import br.com.bliqbrasil.totem.data.model.ConnectionStatus
 import kotlinx.coroutines.*
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.sync.Mutex
@@ -61,6 +64,9 @@ class BliqBleManager(private val context: Context) {
 
     private val _errorMessage = MutableStateFlow<String?>(null)
     val errorMessage: StateFlow<String?> = _errorMessage.asStateFlow()
+
+    private val _notification = MutableSharedFlow<String>(extraBufferCapacity = 8)
+    val notification: SharedFlow<String> = _notification.asSharedFlow()
 
     // ── Internal state ────────────────────────────────────────────────────
 
@@ -132,6 +138,24 @@ class BliqBleManager(private val context: Context) {
             if (status == BluetoothGatt.GATT_SUCCESS) descriptorCont?.resume(Unit) {}
             else descriptorCont?.resumeWithException(Exception("Falha ao habilitar notificações"))
             descriptorCont = null
+        }
+
+        override fun onCharacteristicChanged(
+            g: BluetoothGatt,
+            char: BluetoothGattCharacteristic,
+            value: ByteArray,
+        ) {
+            scope.launch { _notification.emit(value.toString(Charsets.UTF_8)) }
+        }
+
+        @Deprecated("Used for Android < 13")
+        override fun onCharacteristicChanged(
+            g: BluetoothGatt,
+            char: BluetoothGattCharacteristic,
+        ) {
+            @Suppress("DEPRECATION")
+            val value = char.value ?: return
+            scope.launch { _notification.emit(value.toString(Charsets.UTF_8)) }
         }
 
     }

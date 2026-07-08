@@ -134,7 +134,7 @@ class StonePaymentManager {
             }
             instalmentTransaction = InstalmentTransactionEnum.ONE_INSTALMENT
             isCapture = true
-            initiatorTransactionKey = if (type == TransactionType.PIX) null else orderId
+            initiatorTransactionKey = orderId
         }
         currentTransaction = txn
 

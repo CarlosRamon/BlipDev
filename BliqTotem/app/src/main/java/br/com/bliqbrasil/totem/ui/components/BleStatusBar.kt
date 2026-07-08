@@ -23,11 +23,11 @@ private data class StatusConfig(
 )
 
 private fun configFor(status: ConnectionStatus) = when (status) {
-    ConnectionStatus.DISCONNECTED -> StatusConfig(Tertiary, "Conectando ao ESP32...",  true,  false)
-    ConnectionStatus.SCANNING     -> StatusConfig(Warning,  "Procurando ESP32...",      true,  false)
-    ConnectionStatus.CONNECTING   -> StatusConfig(Warning,  "Conectando...",            true,  false)
-    ConnectionStatus.CONNECTED    -> StatusConfig(Success,  "ESP32 conectado",          false, false)
-    ConnectionStatus.RECONNECTING -> StatusConfig(Warning,  "Reconectando ao ESP32...", true,  false)
+    ConnectionStatus.DISCONNECTED -> StatusConfig(Tertiary, "Conectando ao CLP...",  true,  false)
+    ConnectionStatus.SCANNING     -> StatusConfig(Warning,  "Procurando CLP...",      true,  false)
+    ConnectionStatus.CONNECTING   -> StatusConfig(Warning,  "Conectando...",          true,  false)
+    ConnectionStatus.CONNECTED    -> StatusConfig(Success,  "CLP conectado",          false, false)
+    ConnectionStatus.RECONNECTING -> StatusConfig(Warning,  "Reconectando ao CLP...", true,  false)
     ConnectionStatus.ERROR        -> StatusConfig(Error,    "Falha na conexão",         false, true)
 }
 

@@ -8,6 +8,7 @@ import br.com.bliqbrasil.totem.data.model.ConnectionStatus
 import br.com.bliqbrasil.totem.data.model.Machine
 import br.com.bliqbrasil.totem.data.model.machinesForTipo
 import br.com.bliqbrasil.totem.data.repository.PosRepository
+import org.json.JSONObject
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.delay
@@ -36,6 +37,7 @@ class SessionViewModel(
         val sessionStarted: Boolean = false,
         val activeMachine: Machine? = null,
         val isEnding: Boolean = false,
+        val isPaused: Boolean = false,
         val bleError: String? = null,
     )
 
@@ -60,6 +62,7 @@ class SessionViewModel(
             }
         }
         listenForBleConnectToResync()
+        listenForClpNotifications()
         startHeartbeat()
     }
 
@@ -93,27 +96,57 @@ class SessionViewModel(
         viewModelScope.launch {
             bleManager.status.collect { status ->
                 when (status) {
-                    ConnectionStatus.DISCONNECTED -> {
+                    ConnectionStatus.DISCONNECTED,
+                    ConnectionStatus.RECONNECTING -> {
                         didSyncEsp = false
                         espHasSession = false
+                        if (_state.value.sessionStarted && !_state.value.isEnding && !_state.value.isPaused) {
+                            stopTimer()
+                            _state.update { it.copy(activeMachine = null, isPaused = true) }
+                        }
                     }
                     ConnectionStatus.CONNECTED -> {
-                        if (!didSyncEsp && _state.value.sessionStarted) {
-                            didSyncEsp = true
-                            val seconds = maxOf(1, _state.value.remaining)
-                            try {
-                                bleManager.sendCommand("""{"action":"START","duration":$seconds}""")
-                                espHasSession = true
-                                _state.value.activeMachine?.let { machine ->
-                                    bleManager.sendCommand("""{"action":"SELECT","machine":"${machine.name}"}""")
-                                }
-                            } catch (_: Exception) {
-                                didSyncEsp = false
+                        if (!didSyncEsp && _state.value.sessionStarted && !_state.value.isEnding) {
+                            viewModelScope.launch {
+                                try { bleManager.sendCommand("""{"action":"STATUS"}""") } catch (_: Exception) {}
                             }
                         }
                     }
                     else -> Unit
                 }
+            }
+        }
+    }
+
+    private fun listenForClpNotifications() {
+        viewModelScope.launch {
+            bleManager.notification.collect { json ->
+                if (_state.value.isEnding) return@collect
+                try {
+                    val obj = JSONObject(json)
+                    if (obj.optString("status") != "STATUS") return@collect
+
+                    val active    = obj.optBoolean("active", false)
+                    val remaining = obj.optInt("remaining", 0)
+                    val paused    = obj.optBoolean("paused", false)
+                    val machName  = obj.optString("machine", "NONE")
+
+                    if (!active || remaining <= 0 || !paused) return@collect
+
+                    // CLP tem sessão pausada — sincroniza e retoma automaticamente
+                    didSyncEsp = true
+                    espHasSession = true
+                    _state.update { it.copy(remaining = remaining) }
+
+                    val machine = Machine.values().firstOrNull { it.name == machName } ?: return@collect
+                    try {
+                        bleManager.sendCommand("""{"action":"RESUME"}""")
+                        _state.update { it.copy(activeMachine = machine, isPaused = false) }
+                        startTimer()
+                    } catch (e: Exception) {
+                        _state.update { it.copy(bleError = e.message ?: "Erro ao retomar sessão.") }
+                    }
+                } catch (_: Exception) {}
             }
         }
     }
@@ -139,7 +172,7 @@ class SessionViewModel(
 
     fun selectMachine(machine: Machine) {
         if (_state.value.isEnding) return
-        if (machine == _state.value.activeMachine && _state.value.sessionStarted) return
+        if (machine == _state.value.activeMachine && _state.value.sessionStarted && timerJob?.isActive == true) return
 
         viewModelScope.launch {
             _state.update { it.copy(bleError = null) }
@@ -154,11 +187,11 @@ class SessionViewModel(
                     espHasSession = true
                     if (!_state.value.sessionStarted) {
                         _state.update { it.copy(sessionStarted = true) }
-                        startTimer()
                     }
+                    startTimer() // inicia ou retoma após pausa por desconexão
                 }
                 bleManager.sendCommand("""{"action":"SELECT","machine":"${machine.name}"}""")
-                _state.update { it.copy(activeMachine = machine) }
+                _state.update { it.copy(activeMachine = machine, isPaused = false) }
             } catch (e: Exception) {
                 _state.update { it.copy(bleError = e.message ?: "Erro ao enviar comando.") }
             }

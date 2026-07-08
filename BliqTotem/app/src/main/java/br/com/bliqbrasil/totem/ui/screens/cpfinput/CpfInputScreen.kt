@@ -27,8 +27,6 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import br.com.bliqbrasil.totem.ui.components.OutlineButton
 import br.com.bliqbrasil.totem.ui.components.PrimaryButton
@@ -111,13 +109,6 @@ fun CpfInputScreen(
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
 
-    if (state.step == CpfStep.CONSENT) {
-        ConsentDialog(
-            onAccept = viewModel::aceitarConsentimento,
-            onDecline = { onContinue("") },
-        )
-    }
-
     Scaffold(
         topBar = {
             TopAppBar(
@@ -140,7 +131,12 @@ fun CpfInputScreen(
             contentAlignment = Alignment.TopCenter,
         ) {
             when (state.step) {
-                CpfStep.CONSENT -> {}
+                CpfStep.CONSENT ->
+                    ConsentContent(
+                        onAccept = viewModel::aceitarConsentimento,
+                        onDecline = { onContinue("") },
+                        onBack = onBack,
+                    )
                 CpfStep.ENTERING_CPF, CpfStep.LOADING ->
                     EnteringCpfContent(state, viewModel, onSkip = { onContinue("") })
                 CpfStep.FOUND ->
@@ -153,47 +149,41 @@ fun CpfInputScreen(
 }
 
 @Composable
-private fun ConsentDialog(onAccept: () -> Unit, onDecline: () -> Unit) {
-    Dialog(
-        onDismissRequest = {},
-        properties = DialogProperties(dismissOnBackPress = false, dismissOnClickOutside = false),
+private fun ConsentContent(onAccept: () -> Unit, onDecline: () -> Unit, onBack: () -> Unit) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+            .padding(top = 48.dp, bottom = 32.dp),
+        verticalArrangement = Arrangement.spacedBy(20.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Card(
-            shape = RoundedCornerShape(20.dp),
-            elevation = CardDefaults.cardElevation(8.dp),
-            colors = CardDefaults.cardColors(containerColor = Surface),
-        ) {
-            Column(
-                modifier = Modifier.padding(28.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp),
-            ) {
-                Text("🔒", fontSize = 40.sp, modifier = Modifier.align(Alignment.CenterHorizontally))
-                Text(
-                    "Autorização de uso de dados",
-                    fontFamily = FugazOne,
-                    fontSize = 22.sp,
-                    color = OnSurface,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.fillMaxWidth(),
-                )
-                Surface(color = PrimaryLight, shape = RoundedCornerShape(10.dp)) {
-                    Text(
-                        text = "Para personalizar sua experiência e agilizar futuras visitas, " +
-                            "gostaríamos de registrar seu CPF, nome e telefone.\n\n" +
-                            "Seus dados são armazenados com segurança e utilizados exclusivamente " +
-                            "para histórico de uso neste estabelecimento, conforme a Lei Geral de " +
-                            "Proteção de Dados (LGPD — Lei 13.709/2018).",
-                        fontFamily = Epilogue,
-                        fontSize = 14.sp,
-                        color = Secondary,
-                        lineHeight = 21.sp,
-                        modifier = Modifier.padding(14.dp),
-                    )
-                }
-                PrimaryButton(label = "Autorizar e continuar", onClick = onAccept)
-                OutlineButton(label = "Continuar sem identificação", onClick = onDecline)
-            }
+        Text("🔒", fontSize = 48.sp)
+        Text(
+            "Autorização de uso de dados",
+            fontFamily = FugazOne,
+            fontSize = 26.sp,
+            color = OnSurface,
+            textAlign = TextAlign.Center,
+        )
+        Surface(color = PrimaryLight, shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth()) {
+            Text(
+                text = "Para personalizar sua experiência e agilizar futuras visitas, " +
+                    "gostaríamos de registrar seu CPF, nome e telefone.\n\n" +
+                    "Seus dados são armazenados com segurança e utilizados exclusivamente " +
+                    "para histórico de uso neste estabelecimento, conforme a Lei Geral de " +
+                    "Proteção de Dados (LGPD — Lei 13.709/2018).",
+                fontFamily = Epilogue,
+                fontSize = 15.sp,
+                color = Secondary,
+                lineHeight = 23.sp,
+                modifier = Modifier.padding(18.dp),
+            )
         }
+        Spacer(Modifier.height(8.dp))
+        PrimaryButton(label = "Autorizar e continuar", onClick = onAccept)
+        OutlineButton(label = "Continuar sem identificação", onClick = onDecline)
+        OutlineButton(label = "Voltar", onClick = onBack)
     }
 }
 

@@ -6,6 +6,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -13,6 +14,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -34,7 +36,7 @@ fun HomeScreen(
     onNavigateToExtras: (WashOption, boxTipo: String) -> Unit,
     onNavigateToCheckout: (WashOption, List<WashOptionExtra>, Int, Double, boxTipo: String) -> Unit,
     onNavigateToMinutesPicker: (WashOption, boxTipo: String) -> Unit,
-    onNavigateToSession: (cicloId: String, totalMinutes: Int, resumeFromSeconds: Int, boxTipo: String) -> Unit,
+    onNavigateToSession: (cicloId: String, totalMinutes: Int, resumeFromSeconds: Int?, boxTipo: String) -> Unit,
     onNeedActivation: () -> Unit,
     onNavigateToSupport: () -> Unit,
 ) {
@@ -42,6 +44,35 @@ fun HomeScreen(
     val bleStatus by viewModel.bleManager.status.collectAsStateWithLifecycle()
     val bleError  by viewModel.bleManager.errorMessage.collectAsStateWithLifecycle()
     val bleManager = viewModel.bleManager
+
+    var logoTapCount by remember { mutableStateOf(0) }
+    var showResetDialog by remember { mutableStateOf(false) }
+
+    LaunchedEffect(logoTapCount) {
+        if (logoTapCount in 1..6) {
+            kotlinx.coroutines.delay(2_000)
+            logoTapCount = 0
+        }
+    }
+
+    if (showResetDialog) {
+        AlertDialog(
+            onDismissRequest = { showResetDialog = false },
+            title = { Text("Resetar terminal?", fontFamily = FugazOne) },
+            text  = { Text("O terminal será desvinculado e voltará à tela de ativação.", fontFamily = Epilogue) },
+            confirmButton = {
+                TextButton(onClick = {
+                    showResetDialog = false
+                    viewModel.resetTerminal()
+                }) { Text("Resetar", color = Error, fontFamily = Epilogue, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold) }
+            },
+            dismissButton = {
+                TextButton(onClick = { showResetDialog = false }) {
+                    Text("Cancelar", fontFamily = Epilogue)
+                }
+            },
+        )
+    }
 
     val permLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
@@ -98,7 +129,16 @@ fun HomeScreen(
                         contentDescription = "Bliq",
                         modifier = Modifier
                             .fillMaxWidth(0.8f)
-                            .padding(bottom = 16.dp),
+                            .padding(bottom = 16.dp)
+                            .pointerInput(Unit) {
+                                detectTapGestures {
+                                    logoTapCount++
+                                    if (logoTapCount >= 7) {
+                                        logoTapCount = 0
+                                        showResetDialog = true
+                                    }
+                                }
+                            },
                     )
                     state.config?.let { cfg ->
                         Text(

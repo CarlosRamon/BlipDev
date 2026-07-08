@@ -80,6 +80,15 @@ class PosRepository(private val api: ApiService) {
         try { api.registrarTelemetria(TelemetriaRequest(evento, dados)) } catch (_: Exception) {}
     }
 
+    suspend fun heartbeat(
+        bleStatus: String,
+        networkType: String,
+        signalStrength: Int?,
+        appVersion: String,
+    ): Result<HeartbeatResponse> = safeApiCall {
+        api.heartbeat(HeartbeatRequest(bleStatus, networkType, signalStrength, appVersion))
+    }
+
     suspend fun processPayment(method: PaymentMethod, amount: Double): PaymentResult {
         delay(2_000)
         val txId = (1..8).map { ('A'..'Z').random() }.joinToString("")
