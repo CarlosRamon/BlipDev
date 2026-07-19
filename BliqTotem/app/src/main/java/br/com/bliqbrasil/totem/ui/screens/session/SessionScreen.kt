@@ -17,7 +17,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import br.com.bliqbrasil.totem.data.model.ConnectionStatus
 import br.com.bliqbrasil.totem.data.model.Machine
+import br.com.bliqbrasil.totem.ui.components.BleStatusBar
 import br.com.bliqbrasil.totem.ui.theme.*
 import br.com.bliqbrasil.totem.util.formatTime
 
@@ -28,13 +30,31 @@ fun SessionScreen(
     onFinished: () -> Unit,
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    val bleStatus by viewModel.bleManager.status.collectAsStateWithLifecycle()
+    val bleError  by viewModel.bleManager.errorMessage.collectAsStateWithLifecycle()
     var showEndDialog by remember { mutableStateOf(false) }
+    val snackbarHostState = remember { SnackbarHostState() }
 
     BackHandler(enabled = !state.isEnding) { showEndDialog = true }
 
     DisposableEffect(viewModel) {
         viewModel.setOnFinished(onFinished)
         onDispose { viewModel.setOnFinished {} }
+    }
+
+    // Detecta transição isPaused true→false e exibe snackbar de reconexão
+    var wasPaused by remember { mutableStateOf(false) }
+    LaunchedEffect(state.isPaused) {
+        if (state.isPaused) {
+            wasPaused = true
+        } else if (wasPaused) {
+            wasPaused = false
+            val msg = if (state.activeMachine != null)
+                "Sessão retomada automaticamente."
+            else
+                "Equipamento reconectado. Selecione para continuar."
+            snackbarHostState.showSnackbar(msg, duration = SnackbarDuration.Short)
+        }
     }
 
     if (showEndDialog) {
@@ -63,6 +83,16 @@ fun SessionScreen(
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = Primary, titleContentColor = Surface),
                 navigationIcon = {},
             )
+        },
+        snackbarHost = {
+            SnackbarHost(snackbarHostState) { data ->
+                Snackbar(
+                    snackbarData = data,
+                    containerColor = androidx.compose.ui.graphics.Color(0xFF1B5E20),
+                    contentColor = Surface,
+                    shape = RoundedCornerShape(10.dp),
+                )
+            }
         },
         containerColor = Background,
     ) { padding ->
@@ -135,18 +165,13 @@ fun SessionScreen(
                 }
             }
 
-            if (state.isPaused) {
+            if (bleStatus != ConnectionStatus.CONNECTED) {
                 item {
-                    Surface(color = WarningLight, shape = RoundedCornerShape(12.dp)) {
-                        Text(
-                            "Conexão com o CLP perdida. Aguardando reconexão — selecione o equipamento para retomar.",
-                            fontFamily = Epilogue,
-                            fontSize = 13.sp,
-                            color = Warning,
-                            lineHeight = 20.sp,
-                            modifier = Modifier.fillMaxWidth().padding(14.dp),
-                        )
-                    }
+                    BleStatusBar(
+                        status = bleStatus,
+                        errorMessage = bleError,
+                        onForceRetry = { viewModel.bleManager.startAutoConnect(force = true) },
+                    )
                 }
             }
 

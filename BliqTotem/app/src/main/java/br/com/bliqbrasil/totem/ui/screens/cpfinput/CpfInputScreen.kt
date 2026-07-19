@@ -1,6 +1,7 @@
 package br.com.bliqbrasil.totem.ui.screens.cpfinput
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -15,6 +16,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
@@ -135,7 +138,6 @@ fun CpfInputScreen(
                     ConsentContent(
                         onAccept = viewModel::aceitarConsentimento,
                         onDecline = { onContinue("") },
-                        onBack = onBack,
                     )
                 CpfStep.ENTERING_CPF, CpfStep.LOADING ->
                     EnteringCpfContent(state, viewModel, onSkip = { onContinue("") })
@@ -149,41 +151,34 @@ fun CpfInputScreen(
 }
 
 @Composable
-private fun ConsentContent(onAccept: () -> Unit, onDecline: () -> Unit, onBack: () -> Unit) {
+private fun ConsentContent(onAccept: () -> Unit, onDecline: () -> Unit) {
     Column(
         modifier = Modifier
-            .fillMaxSize()
+            .fillMaxWidth()
             .verticalScroll(rememberScrollState())
-            .padding(top = 48.dp, bottom = 32.dp),
-        verticalArrangement = Arrangement.spacedBy(20.dp),
+            .padding(top = 32.dp, bottom = 24.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Text("🔒", fontSize = 48.sp)
+        Text("🔒", fontSize = 36.sp)
         Text(
-            "Autorização de uso de dados",
+            "Uso de dados",
             fontFamily = FugazOne,
-            fontSize = 26.sp,
+            fontSize = 22.sp,
             color = OnSurface,
             textAlign = TextAlign.Center,
         )
-        Surface(color = PrimaryLight, shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth()) {
-            Text(
-                text = "Para personalizar sua experiência e agilizar futuras visitas, " +
-                    "gostaríamos de registrar seu CPF, nome e telefone.\n\n" +
-                    "Seus dados são armazenados com segurança e utilizados exclusivamente " +
-                    "para histórico de uso neste estabelecimento, conforme a Lei Geral de " +
-                    "Proteção de Dados (LGPD — Lei 13.709/2018).",
-                fontFamily = Epilogue,
-                fontSize = 15.sp,
-                color = Secondary,
-                lineHeight = 23.sp,
-                modifier = Modifier.padding(18.dp),
-            )
-        }
-        Spacer(Modifier.height(8.dp))
+        Text(
+            "Para agilizar futuras visitas, registraremos seu CPF, nome e telefone. " +
+                "Dados protegidos conforme a LGPD (Lei 13.709/2018).",
+            fontFamily = Epilogue,
+            fontSize = 14.sp,
+            color = Secondary,
+            textAlign = TextAlign.Center,
+            lineHeight = 21.sp,
+        )
         PrimaryButton(label = "Autorizar e continuar", onClick = onAccept)
         OutlineButton(label = "Continuar sem identificação", onClick = onDecline)
-        OutlineButton(label = "Voltar", onClick = onBack)
     }
 }
 
@@ -280,7 +275,8 @@ private fun FoundContent(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(top = 48.dp),
+            .verticalScroll(rememberScrollState())
+            .padding(top = 32.dp, bottom = 24.dp),
         verticalArrangement = Arrangement.spacedBy(24.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
@@ -316,13 +312,16 @@ private fun NotFoundContent(
     onSkip: () -> Unit,
 ) {
     val keyboard = LocalSoftwareKeyboardController.current
+    val focusManager = LocalFocusManager.current
     val isRegistering = state.step == CpfStep.REGISTERING
     val canSubmit = state.nome.trim().length >= 2 && state.telefone.length >= 10 && !isRegistering
 
     Column(
         modifier = Modifier
             .fillMaxWidth()
+            .imePadding()
             .verticalScroll(rememberScrollState())
+            .pointerInput(Unit) { detectTapGestures { focusManager.clearFocus() } }
             .padding(top = 32.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {

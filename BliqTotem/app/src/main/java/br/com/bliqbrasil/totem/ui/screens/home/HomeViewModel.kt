@@ -36,6 +36,7 @@ class HomeViewModel(
         val error: String? = null,
         val needsActivation: Boolean = false,
         val activeSession: ActiveSession? = null,
+        val showWelcome: Boolean = true,
     )
 
     data class ActiveSession(
@@ -163,6 +164,10 @@ class HomeViewModel(
             caps.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET) -> Pair("ETHERNET", null)
             else -> Pair("NONE", null)
         }
+    }
+
+    fun dismissWelcome() {
+        _state.update { it.copy(showWelcome = false) }
     }
 
     fun consumeActiveSession() {

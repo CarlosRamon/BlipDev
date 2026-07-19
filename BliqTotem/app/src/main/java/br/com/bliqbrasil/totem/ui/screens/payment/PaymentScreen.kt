@@ -5,6 +5,8 @@ import androidx.compose.animation.core.*
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
@@ -172,7 +174,9 @@ private fun WaitingQrCodeContent(state: PaymentState.WaitingQrCode, onCancel: ()
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(20.dp),
-        modifier = Modifier.padding(32.dp),
+        modifier = Modifier
+            .verticalScroll(rememberScrollState())
+            .padding(32.dp),
     ) {
         Text(
             text       = "Escaneie o QR Code PIX",
@@ -188,7 +192,7 @@ private fun WaitingQrCodeContent(state: PaymentState.WaitingQrCode, onCancel: ()
                 bitmap             = bitmap.asImageBitmap(),
                 contentDescription = "QR Code PIX",
                 modifier           = Modifier
-                    .size(240.dp)
+                    .size(200.dp)
                     .clip(RoundedCornerShape(16.dp))
                     .background(Color.White)
                     .padding(12.dp),
@@ -197,7 +201,7 @@ private fun WaitingQrCodeContent(state: PaymentState.WaitingQrCode, onCancel: ()
             Box(
                 contentAlignment = Alignment.Center,
                 modifier = Modifier
-                    .size(240.dp)
+                    .size(200.dp)
                     .clip(RoundedCornerShape(16.dp))
                     .background(Surface),
             ) {

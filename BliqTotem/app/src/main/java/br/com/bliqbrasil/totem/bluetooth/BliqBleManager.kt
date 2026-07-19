@@ -73,8 +73,8 @@ class BliqBleManager(private val context: Context) {
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private val writeMutex = Mutex()
 
-    private var gatt: BluetoothGatt? = null
-    private var characteristic: BluetoothGattCharacteristic? = null
+    @Volatile private var gatt: BluetoothGatt? = null
+    @Volatile private var characteristic: BluetoothGattCharacteristic? = null
 
     // Persistent connection loop job — cancelled on explicit disconnect
     private var connectionJob: Job? = null
@@ -290,9 +290,14 @@ class BliqBleManager(private val context: Context) {
     }
 
     private fun handleUnexpectedDisconnect() {
-        closeGatt()
+        // Atualiza o status ANTES de zerar o gatt — evita janela onde status=CONNECTED mas gatt=null
         if (autoReconnect) {
             _status.value = ConnectionStatus.RECONNECTING
+        } else {
+            _status.value = ConnectionStatus.DISCONNECTED
+        }
+        closeGatt()
+        if (autoReconnect) {
             connectionJob?.cancel()
             connectionJob = scope.launch {
                 val delayMs = RECONNECT_DELAYS.getOrElse(retryAttempt) { RECONNECT_DELAYS.last() }
@@ -300,8 +305,6 @@ class BliqBleManager(private val context: Context) {
                 retryAttempt++
                 connectionLoop()
             }
-        } else {
-            _status.value = ConnectionStatus.DISCONNECTED
         }
     }
 

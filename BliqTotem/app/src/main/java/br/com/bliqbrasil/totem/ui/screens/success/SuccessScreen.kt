@@ -1,8 +1,10 @@
 package br.com.bliqbrasil.totem.ui.screens.success
 
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -43,42 +45,43 @@ fun SuccessScreen(
         },
         containerColor = Background,
     ) { padding ->
-        Column(
+        BoxWithConstraints(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(padding)
-                .padding(24.dp),
-            verticalArrangement = Arrangement.SpaceBetween,
+                .padding(padding),
         ) {
+            val minHeight = maxHeight
             Column(
-                modifier = Modifier.weight(1f),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = minHeight)
+                    .verticalScroll(rememberScrollState())
+                    .padding(horizontal = 24.dp, vertical = 24.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center,
             ) {
-                Spacer(Modifier.weight(1f))
-
                 Surface(
                     shape = CircleShape,
                     color = SuccessLight,
-                    modifier = Modifier.size(96.dp),
+                    modifier = Modifier.size(80.dp),
                 ) {
                     Box(contentAlignment = Alignment.Center) {
-                        Text("✅", fontSize = 48.sp)
+                        Text("✅", fontSize = 36.sp)
                     }
                 }
 
-                Spacer(Modifier.height(20.dp))
+                Spacer(Modifier.height(16.dp))
 
                 Text(
                     text = "Pagamento realizado\ncom sucesso!",
                     fontFamily = FugazOne,
-                    fontSize = 24.sp,
+                    fontSize = 22.sp,
                     color = OnSurface,
                     textAlign = TextAlign.Center,
-                    lineHeight = 32.sp,
+                    lineHeight = 30.sp,
                 )
 
-                Spacer(Modifier.height(20.dp))
+                Spacer(Modifier.height(16.dp))
 
                 Card(
                     shape = RoundedCornerShape(14.dp),
@@ -113,7 +116,7 @@ fun SuccessScreen(
                     }
                 }
 
-                Spacer(Modifier.height(20.dp))
+                Spacer(Modifier.height(16.dp))
 
                 val isError = state.bleStep == BleStep.ERROR
                 Surface(
@@ -151,11 +154,10 @@ fun SuccessScreen(
                     }
                 }
 
-                Spacer(Modifier.weight(1f))
-            }
-
-            if (state.bleStep == BleStep.ERROR) {
-                OutlineButton(label = "Voltar ao início", onClick = onBackToHome, modifier = Modifier.padding(top = 16.dp))
+                if (state.bleStep == BleStep.ERROR) {
+                    Spacer(Modifier.height(16.dp))
+                    OutlineButton(label = "Voltar ao início", onClick = onBackToHome)
+                }
             }
         }
     }

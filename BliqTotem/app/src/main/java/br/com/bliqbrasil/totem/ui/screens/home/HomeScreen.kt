@@ -2,6 +2,7 @@ package br.com.bliqbrasil.totem.ui.screens.home
 
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.core.*
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -14,6 +15,8 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.scale
+import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
@@ -23,6 +26,8 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import br.com.bliqbrasil.totem.BuildConfig
 import br.com.bliqbrasil.totem.R
+import br.com.bliqbrasil.totem.data.model.ConnectionStatus
+import br.com.bliqbrasil.totem.data.model.PosConfig
 import br.com.bliqbrasil.totem.data.model.WashOption
 import br.com.bliqbrasil.totem.data.model.WashOptionExtra
 import br.com.bliqbrasil.totem.ui.components.BleStatusBar
@@ -55,25 +60,6 @@ fun HomeScreen(
         }
     }
 
-    if (showResetDialog) {
-        AlertDialog(
-            onDismissRequest = { showResetDialog = false },
-            title = { Text("Resetar terminal?", fontFamily = FugazOne) },
-            text  = { Text("O terminal será desvinculado e voltará à tela de ativação.", fontFamily = Epilogue) },
-            confirmButton = {
-                TextButton(onClick = {
-                    showResetDialog = false
-                    viewModel.resetTerminal()
-                }) { Text("Resetar", color = Error, fontFamily = Epilogue, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold) }
-            },
-            dismissButton = {
-                TextButton(onClick = { showResetDialog = false }) {
-                    Text("Cancelar", fontFamily = Epilogue)
-                }
-            },
-        )
-    }
-
     val permLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
     ) { results ->
@@ -94,6 +80,34 @@ fun HomeScreen(
             viewModel.consumeActiveSession()
             onNavigateToSession(session.cicloId, session.totalMinutes, session.resumeFromSeconds, session.boxTipo)
         }
+    }
+
+    if (state.showWelcome) {
+        WelcomeContent(
+            config    = state.config,
+            bleStatus = bleStatus,
+            onStart   = viewModel::dismissWelcome,
+        )
+        return
+    }
+
+    if (showResetDialog) {
+        AlertDialog(
+            onDismissRequest = { showResetDialog = false },
+            title = { Text("Resetar terminal?", fontFamily = FugazOne) },
+            text  = { Text("O terminal será desvinculado e voltará à tela de ativação.", fontFamily = Epilogue) },
+            confirmButton = {
+                TextButton(onClick = {
+                    showResetDialog = false
+                    viewModel.resetTerminal()
+                }) { Text("Resetar", color = Error, fontFamily = Epilogue, fontWeight = FontWeight.Bold) }
+            },
+            dismissButton = {
+                TextButton(onClick = { showResetDialog = false }) {
+                    Text("Cancelar", fontFamily = Epilogue)
+                }
+            },
+        )
     }
 
     Scaffold(
@@ -231,6 +245,92 @@ fun HomeScreen(
                     })
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun WelcomeContent(
+    config: PosConfig?,
+    bleStatus: ConnectionStatus,
+    onStart: () -> Unit,
+) {
+    val infiniteTransition = rememberInfiniteTransition(label = "pulse")
+    val scale by infiniteTransition.animateFloat(
+        initialValue = 1f,
+        targetValue  = 1.06f,
+        animationSpec = infiniteRepeatable(
+            animation  = tween(900, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse,
+        ),
+        label = "scale",
+    )
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Primary),
+        contentAlignment = Alignment.Center,
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(28.dp),
+            modifier = Modifier.padding(horizontal = 48.dp),
+        ) {
+            Image(
+                painter          = painterResource(R.drawable.bliq_tagline),
+                contentDescription = "Bliq",
+                modifier         = Modifier.fillMaxWidth(0.65f),
+                colorFilter      = ColorFilter.tint(Surface),
+            )
+
+            config?.let { cfg ->
+                Text(
+                    text       = cfg.box.nome,
+                    fontSize   = 18.sp,
+                    fontFamily = FugazOne,
+                    color      = Surface.copy(alpha = 0.8f),
+                    textAlign  = TextAlign.Center,
+                )
+            }
+
+            Button(
+                onClick = onStart,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(56.dp)
+                    .scale(scale),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = Surface,
+                    contentColor   = Primary,
+                ),
+                shape = RoundedCornerShape(14.dp),
+            ) {
+                Text(
+                    "Toque para iniciar",
+                    fontFamily  = Epilogue,
+                    fontSize    = 17.sp,
+                    fontWeight  = FontWeight.SemiBold,
+                )
+            }
+        }
+
+        val (dot, label) = when (bleStatus) {
+            ConnectionStatus.CONNECTED    -> "●" to "Equipamento conectado"
+            ConnectionStatus.SCANNING,
+            ConnectionStatus.CONNECTING   -> "◌" to "Conectando ao equipamento..."
+            ConnectionStatus.RECONNECTING -> "◌" to "Reconectando..."
+            else                          -> "○" to "Aguardando equipamento"
+        }
+        Row(
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(bottom = 28.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            Text(dot,   fontSize = 10.sp, color = Surface.copy(alpha = 0.5f))
+            Text(label, fontFamily = Epilogue, fontSize = 13.sp, color = Surface.copy(alpha = 0.5f))
         }
     }
 }

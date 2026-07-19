@@ -1,5 +1,6 @@
 package br.com.bliqbrasil.totem.ui.screens.session
 
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
@@ -21,7 +22,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 
 class SessionViewModel(
     private val repository: PosRepository,
-    private val bleManager: BliqBleManager,
+    val bleManager: BliqBleManager,
     val cicloId: String,
     val totalMinutes: Int,
     val resumeFromSeconds: Int?,
@@ -106,9 +107,13 @@ class SessionViewModel(
                         }
                     }
                     ConnectionStatus.CONNECTED -> {
-                        if (!didSyncEsp && _state.value.sessionStarted && !_state.value.isEnding) {
-                            viewModelScope.launch {
-                                try { bleManager.sendCommand("""{"action":"STATUS"}""") } catch (_: Exception) {}
+                        if (_state.value.sessionStarted && !_state.value.isEnding) {
+                            // Libera UI imediatamente — não espera STATUS do ESP para desbloquear
+                            _state.update { it.copy(isPaused = false) }
+                            if (!didSyncEsp) {
+                                viewModelScope.launch {
+                                    try { bleManager.sendCommand("""{"action":"STATUS"}""") } catch (_: Exception) {}
+                                }
                             }
                         }
                     }
@@ -131,14 +136,27 @@ class SessionViewModel(
                     val paused    = obj.optBoolean("paused", false)
                     val machName  = obj.optString("machine", "NONE")
 
-                    if (!active || remaining <= 0 || !paused) return@collect
-
-                    // CLP tem sessão pausada — sincroniza e retoma automaticamente
                     didSyncEsp = true
+
+                    if (!active || remaining <= 0) {
+                        // ESP não tem sessão ativa — libera UI para o usuário tocar uma máquina
+                        espHasSession = false
+                        _state.update { it.copy(isPaused = false) }
+                        return@collect
+                    }
+
                     espHasSession = true
                     _state.update { it.copy(remaining = remaining) }
+                    val machine = Machine.values().firstOrNull { it.name == machName }
 
-                    val machine = Machine.values().firstOrNull { it.name == machName } ?: return@collect
+                    if (!paused) {
+                        // ESP está rodando — sincroniza estado e retoma timer local
+                        _state.update { it.copy(activeMachine = machine, isPaused = false) }
+                        startTimer()
+                        return@collect
+                    }
+
+                    // ESP com sessão pausada — envia RESUME (machine pode ser null se nenhuma foi selecionada)
                     try {
                         bleManager.sendCommand("""{"action":"RESUME"}""")
                         _state.update { it.copy(activeMachine = machine, isPaused = false) }
@@ -162,7 +180,9 @@ class SessionViewModel(
                     val seconds = maxOf(1, s.remaining)
                     bleManager.sendCommand("""{"action":"START","duration":$seconds}""")
                     espHasSession = true
-                    bleManager.sendCommand("""{"action":"SELECT","machine":"${s.activeMachine.name}"}""")
+                    // SELECT não é enviado aqui — a ESP guarda o activeMachine internamente.
+                    // Enviar SELECT no heartbeat causava race condition com selectMachine()
+                    // e sobrescrevia a seleção do usuário com o snapshot antigo.
                 } catch (_: Exception) { }
             }
         }
@@ -188,11 +208,12 @@ class SessionViewModel(
                     if (!_state.value.sessionStarted) {
                         _state.update { it.copy(sessionStarted = true) }
                     }
-                    startTimer() // inicia ou retoma após pausa por desconexão
                 }
                 bleManager.sendCommand("""{"action":"SELECT","machine":"${machine.name}"}""")
                 _state.update { it.copy(activeMachine = machine, isPaused = false) }
+                startTimer() // sempre tenta iniciar (guard interno evita duplo início)
             } catch (e: Exception) {
+                Log.e("SessionVM", "selectMachine erro [status=${bleManager.status.value}]: ${e.message}")
                 _state.update { it.copy(bleError = e.message ?: "Erro ao enviar comando.") }
             }
         }
