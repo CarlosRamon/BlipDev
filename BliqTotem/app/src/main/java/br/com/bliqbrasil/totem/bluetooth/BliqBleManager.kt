@@ -17,14 +17,17 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.onSubscription
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import java.util.UUID
 import kotlin.coroutines.resumeWithException
 
-private const val CCCD_UUID       = "00002902-0000-1000-8000-00805f9b34fb"
-private const val SCAN_TIMEOUT_MS = 10_000L
+private const val CCCD_UUID            = "00002902-0000-1000-8000-00805f9b34fb"
+private const val SCAN_TIMEOUT_MS      = 10_000L
+private const val KEEPALIVE_INTERVAL_MS = 30_000L
 
 // Backoff delays between retry attempts: 3s, 5s, 8s, 12s, 15s, 15s…
 private val RECONNECT_DELAYS = listOf(3_000L, 5_000L, 8_000L, 12_000L, 15_000L)
@@ -78,6 +81,7 @@ class BliqBleManager(private val context: Context) {
 
     // Persistent connection loop job — cancelled on explicit disconnect
     private var connectionJob: Job? = null
+    private var keepAliveJob:  Job? = null
     private var autoReconnect  = false
     private var retryAttempt   = 0
     private var lastAddress: String? = null
@@ -87,6 +91,7 @@ class BliqBleManager(private val context: Context) {
     private var discoverCont:   CancellableContinuation<Unit>? = null
     private var writeCont:      CancellableContinuation<Unit>? = null
     private var descriptorCont: CancellableContinuation<Unit>? = null
+    @Volatile private var rssiCont: CancellableContinuation<Unit>? = null
 
     // ── GATT callback ─────────────────────────────────────────────────────
 
@@ -158,6 +163,12 @@ class BliqBleManager(private val context: Context) {
             scope.launch { _notification.emit(value.toString(Charsets.UTF_8)) }
         }
 
+        override fun onReadRemoteRssi(g: BluetoothGatt, rssi: Int, status: Int) {
+            if (status == BluetoothGatt.GATT_SUCCESS) rssiCont?.resume(Unit) {}
+            else rssiCont?.resumeWithException(Exception("RSSI falhou (status $status)"))
+            rssiCont = null
+        }
+
     }
 
     // ── Public API ────────────────────────────────────────────────────────
@@ -200,14 +211,20 @@ class BliqBleManager(private val context: Context) {
         writeMutex.withLock {
             suspendCancellableCoroutine<Unit> { cont ->
                 writeCont = cont
+                cont.invokeOnCancellation { writeCont = null }
                 val data = json.toByteArray(Charsets.UTF_8)
+                val started: Boolean
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                    g.writeCharacteristic(char, data, BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT)
+                    started = g.writeCharacteristic(char, data, BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT) == BluetoothGatt.GATT_SUCCESS
                 } else {
                     @Suppress("DEPRECATION")
                     char.value = data
                     @Suppress("DEPRECATION")
-                    g.writeCharacteristic(char)
+                    started = g.writeCharacteristic(char)
+                }
+                if (!started) {
+                    writeCont = null
+                    cont.resumeWithException(Exception("writeCharacteristic() não iniciou — BLE ocupado"))
                 }
             }
         }
@@ -215,6 +232,8 @@ class BliqBleManager(private val context: Context) {
 
     fun disconnect() {
         autoReconnect = false
+        keepAliveJob?.cancel()
+        keepAliveJob = null
         connectionJob?.cancel()
         connectionJob = null
         gatt?.disconnect()
@@ -240,14 +259,6 @@ class BliqBleManager(private val context: Context) {
             arrayOf(Manifest.permission.ACCESS_FINE_LOCATION)
         }
 
-    fun onDestroy() {
-        autoReconnect = false
-        connectionJob?.cancel()
-        scope.cancel()
-        gatt?.close()
-        gatt = null
-    }
-
     // ── Connection loop (auto-connect + auto-reconnect) ───────────────────
 
     private suspend fun connectionLoop() {
@@ -272,6 +283,7 @@ class BliqBleManager(private val context: Context) {
                 doConnect(device)
                 _status.value = ConnectionStatus.CONNECTED
                 retryAttempt = 0
+                startKeepAlive()
                 return  // Stay connected — gattCallback handles drops
             } catch (e: Exception) {
                 Log.e("BliqBLE", "Falha na conexão (tentativa $retryAttempt): ${e.message}")
@@ -290,6 +302,10 @@ class BliqBleManager(private val context: Context) {
     }
 
     private fun handleUnexpectedDisconnect() {
+        // Evita dupla chamada (gattCallback + keepAlive simultaneamente)
+        if (_status.value == ConnectionStatus.RECONNECTING) return
+        keepAliveJob?.cancel()
+        keepAliveJob = null
         // Atualiza o status ANTES de zerar o gatt — evita janela onde status=CONNECTED mas gatt=null
         if (autoReconnect) {
             _status.value = ConnectionStatus.RECONNECTING
@@ -304,6 +320,26 @@ class BliqBleManager(private val context: Context) {
                 delay(delayMs)
                 retryAttempt++
                 connectionLoop()
+            }
+        }
+    }
+
+    private fun startKeepAlive() {
+        keepAliveJob?.cancel()
+        keepAliveJob = scope.launch {
+            while (autoReconnect && _status.value == ConnectionStatus.CONNECTED) {
+                delay(KEEPALIVE_INTERVAL_MS)
+                if (_status.value != ConnectionStatus.CONNECTED) break
+                if (gatt == null || characteristic == null) break
+                try {
+                    verifyLinkWithWrite()
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    Log.w("BliqBLE", "Keep-alive: ESP não respondeu — ${e.message}")
+                    handleUnexpectedDisconnect()
+                    break
+                }
             }
         }
     }
@@ -356,14 +392,45 @@ class BliqBleManager(private val context: Context) {
     private suspend fun doConnect(device: BluetoothDevice) {
         suspendCancellableCoroutine<Unit> { cont ->
             connectCont = cont
+            cont.invokeOnCancellation { connectCont = null }
             gatt = device.connectGatt(context, false, gattCallback, BluetoothDevice.TRANSPORT_LE)
         }
         val g = gatt ?: throw Exception("GATT nulo após conexão.")
-        suspendCancellableCoroutine<Unit> { cont ->
-            discoverCont = cont
-            g.discoverServices()
+        // Limpa cache GATT do Android para forçar descoberta real via rádio BLE.
+        // Sem isso, discoverServices() responde do cache e passa em conexões fantasmas.
+        try { BluetoothGatt::class.java.getMethod("refresh").invoke(g) } catch (_: Exception) {}
+        try {
+            withTimeout(10_000L) {
+                suspendCancellableCoroutine<Unit> { cont ->
+                    discoverCont = cont
+                    cont.invokeOnCancellation { discoverCont = null }
+                    if (!g.discoverServices()) {
+                        discoverCont = null
+                        cont.resumeWithException(Exception("discoverServices() retornou false"))
+                    }
+                }
+            }
+        } catch (_: TimeoutCancellationException) {
+            throw Exception("ESP32 não respondeu ao discovery — possível conexão fantasma")
         }
         setupCharacteristic(g)
+        verifyLinkWithWrite()
+    }
+
+    // Envia STATUS e espera a NOTIFICATION de resposta do ESP32.
+    // ACK do ATT write não basta: em modo keepalive/idle, a stack BLE do ESP32 pode
+    // continuar respondendo no nível ATT sem o firmware processar o comando.
+    // Só a notification confirma que a camada de aplicação está viva.
+    private suspend fun verifyLinkWithWrite() {
+        val received = withTimeoutOrNull(3_000L) {
+            _notification
+                .onSubscription { sendCommand("""{"action":"STATUS"}""") }
+                .filter { it.contains("\"status\":\"STATUS\"") }
+                .first()
+        }
+        if (received == null) {
+            throw Exception("ESP32 não respondeu STATUS na aplicação — conexão fantasma/idle")
+        }
     }
 
     private suspend fun setupCharacteristic(g: BluetoothGatt) {

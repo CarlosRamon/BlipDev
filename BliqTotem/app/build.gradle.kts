@@ -27,8 +27,8 @@ android {
         applicationId = "br.com.bliqbrasil.totem"
         minSdk        = 22
         targetSdk     = 35
-        versionCode   = 3
-        versionName   = "1.0.2"
+        versionCode   = 4
+        versionName   = "1.0.3"
 
         buildConfigField("boolean", "STONE_ENABLED", "true")
         buildConfigField("String", "STONE_CODE",

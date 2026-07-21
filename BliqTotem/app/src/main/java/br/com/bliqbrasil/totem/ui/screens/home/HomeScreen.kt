@@ -86,6 +86,7 @@ fun HomeScreen(
         WelcomeContent(
             config    = state.config,
             bleStatus = bleStatus,
+            pingState = state.pingState,
             onStart   = viewModel::dismissWelcome,
         )
         return
@@ -253,6 +254,7 @@ fun HomeScreen(
 private fun WelcomeContent(
     config: PosConfig?,
     bleStatus: ConnectionStatus,
+    pingState: HomeViewModel.PingState,
     onStart: () -> Unit,
 ) {
     val infiniteTransition = rememberInfiniteTransition(label = "pulse")
@@ -294,24 +296,73 @@ private fun WelcomeContent(
                 )
             }
 
-            Button(
-                onClick = onStart,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(56.dp)
-                    .scale(scale),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = Surface,
-                    contentColor   = Primary,
-                ),
-                shape = RoundedCornerShape(14.dp),
-            ) {
-                Text(
-                    "Toque para iniciar",
-                    fontFamily  = Epilogue,
-                    fontSize    = 17.sp,
-                    fontWeight  = FontWeight.SemiBold,
-                )
+            when (pingState) {
+                HomeViewModel.PingState.IDLE -> {
+                    Button(
+                        onClick  = onStart,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(56.dp)
+                            .scale(scale),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Surface,
+                            contentColor   = Primary,
+                        ),
+                        shape = RoundedCornerShape(14.dp),
+                    ) {
+                        Text(
+                            "Toque para iniciar",
+                            fontFamily = Epilogue,
+                            fontSize   = 17.sp,
+                            fontWeight = FontWeight.SemiBold,
+                        )
+                    }
+                }
+
+                HomeViewModel.PingState.CONNECTING -> {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(16.dp),
+                    ) {
+                        CircularProgressIndicator(
+                            color       = Surface,
+                            strokeWidth = 3.dp,
+                            modifier    = Modifier.size(40.dp),
+                        )
+                        Text(
+                            "Conectando equipamento...",
+                            fontFamily  = Epilogue,
+                            fontSize    = 17.sp,
+                            fontWeight  = FontWeight.SemiBold,
+                            color       = Surface,
+                            textAlign   = TextAlign.Center,
+                        )
+                    }
+                }
+
+                HomeViewModel.PingState.CONNECTED -> {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(16.dp),
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(48.dp)
+                                .background(Success, RoundedCornerShape(24.dp)),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Text("✓", fontSize = 24.sp, color = Surface, fontWeight = FontWeight.Bold)
+                        }
+                        Text(
+                            "Equipamento conectado!",
+                            fontFamily  = Epilogue,
+                            fontSize    = 17.sp,
+                            fontWeight  = FontWeight.SemiBold,
+                            color       = Surface,
+                            textAlign   = TextAlign.Center,
+                        )
+                    }
+                }
             }
         }
 

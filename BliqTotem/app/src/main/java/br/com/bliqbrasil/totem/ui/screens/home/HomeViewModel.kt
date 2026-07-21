@@ -16,10 +16,10 @@ import br.com.bliqbrasil.totem.data.model.WashOption
 import br.com.bliqbrasil.totem.data.model.WashOptionExtra
 import br.com.bliqbrasil.totem.data.repository.PosRepository
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
-import kotlinx.coroutines.launch
 
 class HomeViewModel(
     application: Application,
@@ -27,6 +27,8 @@ class HomeViewModel(
     val bleManager: BliqBleManager,
     private val tokenStorage: TokenStorage,
 ) : AndroidViewModel(application) {
+
+    enum class PingState { IDLE, CONNECTING, CONNECTED }
 
     data class UiState(
         val config: PosConfig? = null,
@@ -37,6 +39,7 @@ class HomeViewModel(
         val needsActivation: Boolean = false,
         val activeSession: ActiveSession? = null,
         val showWelcome: Boolean = true,
+        val pingState: PingState = PingState.IDLE,
     )
 
     data class ActiveSession(
@@ -167,7 +170,18 @@ class HomeViewModel(
     }
 
     fun dismissWelcome() {
-        _state.update { it.copy(showWelcome = false) }
+        viewModelScope.launch {
+            _state.update { it.copy(pingState = PingState.CONNECTING) }
+            try {
+                bleManager.waitForConnection(timeoutMs = 15_000L)
+            } catch (e: Exception) {
+                _state.update { it.copy(pingState = PingState.IDLE) }
+                return@launch
+            }
+            _state.update { it.copy(pingState = PingState.CONNECTED) }
+            delay(1_200)
+            _state.update { it.copy(showWelcome = false, pingState = PingState.IDLE) }
+        }
     }
 
     fun consumeActiveSession() {
