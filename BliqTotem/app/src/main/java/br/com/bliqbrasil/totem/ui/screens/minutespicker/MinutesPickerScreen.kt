@@ -28,7 +28,7 @@ fun MinutesPickerScreen(
     onBack: () -> Unit,
     onContinue: (minutes: Int, totalPrice: Double) -> Unit,
 ) {
-    var minutes by remember { mutableIntStateOf(5) }
+    var minutes by remember { mutableIntStateOf(1) }
     val totalPrice = minutes * washOption.price
 
     Scaffold(

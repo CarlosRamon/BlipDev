@@ -22,11 +22,29 @@ class PosRepository(private val api: ApiService) {
         if (response.code() == 204 || !response.isSuccessful) null else response.body()
     }
 
+    suspend fun getTermosAtual(): Result<TermosAtual> =
+        safeApiCall { api.getTermosAtual() }
+
     suspend fun buscarCliente(cpf: String): Result<ClienteLookupResponse> =
         safeApiCall { api.buscarCliente(cpf) }
 
-    suspend fun criarCliente(cpf: String, nome: String, telefone: String): Result<Cliente> =
-        safeApiCall { api.criarCliente(CriarClienteRequest(cpf, nome, telefone)) }
+    suspend fun criarCliente(
+        cpf: String,
+        nome: String,
+        telefone: String,
+        termosVersao: String,
+        aceitaMarketing: Boolean,
+    ): Result<Cliente> = safeApiCall {
+        api.criarCliente(
+            CriarClienteRequest(
+                cpf = cpf,
+                nome = nome,
+                telefone = telefone,
+                termosVersao = termosVersao,
+                aceitaMarketing = aceitaMarketing,
+            )
+        )
+    }
 
     suspend fun criarCiclo(
         produtoId: String,

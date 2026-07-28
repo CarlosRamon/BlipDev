@@ -134,11 +134,6 @@ fun CpfInputScreen(
             contentAlignment = Alignment.TopCenter,
         ) {
             when (state.step) {
-                CpfStep.CONSENT ->
-                    ConsentContent(
-                        onAccept = viewModel::aceitarConsentimento,
-                        onDecline = { onContinue("") },
-                    )
                 CpfStep.ENTERING_CPF, CpfStep.LOADING ->
                     EnteringCpfContent(state, viewModel, onSkip = { onContinue("") })
                 CpfStep.FOUND ->
@@ -147,38 +142,6 @@ fun CpfInputScreen(
                     NotFoundContent(state, viewModel, onSuccess = onContinue, onSkip = { onContinue("") })
             }
         }
-    }
-}
-
-@Composable
-private fun ConsentContent(onAccept: () -> Unit, onDecline: () -> Unit) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .verticalScroll(rememberScrollState())
-            .padding(top = 32.dp, bottom = 24.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        Text("🔒", fontSize = 36.sp)
-        Text(
-            "Uso de dados",
-            fontFamily = FugazOne,
-            fontSize = 22.sp,
-            color = OnSurface,
-            textAlign = TextAlign.Center,
-        )
-        Text(
-            "Para agilizar futuras visitas, registraremos seu CPF, nome e telefone. " +
-                "Dados protegidos conforme a LGPD (Lei 13.709/2018).",
-            fontFamily = Epilogue,
-            fontSize = 14.sp,
-            color = Secondary,
-            textAlign = TextAlign.Center,
-            lineHeight = 21.sp,
-        )
-        PrimaryButton(label = "Autorizar e continuar", onClick = onAccept)
-        OutlineButton(label = "Continuar sem identificação", onClick = onDecline)
     }
 }
 
@@ -203,12 +166,12 @@ private fun EnteringCpfContent(
     ) {
         Text("Digite seu CPF", fontFamily = FugazOne, fontSize = 28.sp, color = OnSurface)
         Text(
-            "Identificamos sua conta para agilizar o atendimento",
+            "Identifica sua conta para agilizar futuros atendimentos.\nSeus dados são tratados conforme a LGPD (Lei 13.709/2018).",
             fontFamily = Epilogue,
-            fontSize = 15.sp,
+            fontSize = 14.sp,
             color = Secondary,
             textAlign = TextAlign.Center,
-            lineHeight = 22.sp,
+            lineHeight = 20.sp,
         )
 
         Card(
@@ -314,7 +277,14 @@ private fun NotFoundContent(
     val keyboard = LocalSoftwareKeyboardController.current
     val focusManager = LocalFocusManager.current
     val isRegistering = state.step == CpfStep.REGISTERING
-    val canSubmit = state.nome.trim().length >= 2 && state.telefone.length >= 10 && !isRegistering
+    val canSubmit = state.nome.trim().length >= 2 &&
+        state.telefone.length >= 10 &&
+        state.aceitouTermos &&
+        state.termos != null &&
+        !isRegistering
+
+    var showTerms by remember { mutableStateOf(false) }
+    if (showTerms) TermsDialog(state.termos, onDismiss = { showTerms = false })
 
     Column(
         modifier = Modifier
@@ -322,7 +292,7 @@ private fun NotFoundContent(
             .imePadding()
             .verticalScroll(rememberScrollState())
             .pointerInput(Unit) { detectTapGestures { focusManager.clearFocus() } }
-            .padding(top = 32.dp),
+            .padding(top = 32.dp, bottom = 24.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         Text("Novo cadastro", fontFamily = FugazOne, fontSize = 26.sp, color = OnSurface)
@@ -340,7 +310,6 @@ private fun NotFoundContent(
             colors = CardDefaults.cardColors(containerColor = Surface),
         ) {
             Column(modifier = Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                // CPF desabilitado: sem cursor, pode usar valor mascarado diretamente
                 LabeledField(label = "CPF", value = maskCpf(state.cpf), enabled = false)
                 LabeledField(
                     label = "NOME COMPLETO *",
@@ -363,6 +332,14 @@ private fun NotFoundContent(
                 )
             }
         }
+
+        ConsentsCard(
+            state = state,
+            onToggleTermos = viewModel::toggleAceitouTermos,
+            onToggleMarketing = viewModel::toggleAceitaMarketing,
+            onOpenTerms = { showTerms = true },
+            onRetryTerms = viewModel::carregarTermos,
+        )
 
         if (state.error != null) {
             Surface(color = ErrorSurface, shape = RoundedCornerShape(8.dp)) {
@@ -387,6 +364,158 @@ private fun NotFoundContent(
         )
         OutlineButton(label = "Pular identificação", onClick = onSkip, enabled = !isRegistering)
     }
+}
+
+@Composable
+private fun ConsentsCard(
+    state: CpfInputViewModel.UiState,
+    onToggleTermos: (Boolean) -> Unit,
+    onToggleMarketing: (Boolean) -> Unit,
+    onOpenTerms: () -> Unit,
+    onRetryTerms: () -> Unit,
+) {
+    Card(
+        shape = RoundedCornerShape(16.dp),
+        elevation = CardDefaults.cardElevation(2.dp),
+        colors = CardDefaults.cardColors(containerColor = Surface),
+    ) {
+        Column(modifier = Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            when {
+                state.termosLoading -> {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        CircularProgressIndicator(color = Primary, modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                        Text("Carregando Termos de Uso...", fontFamily = Epilogue, fontSize = 14.sp, color = Secondary)
+                    }
+                }
+                state.termosError != null -> {
+                    Text(state.termosError, fontFamily = Epilogue, fontSize = 14.sp, color = Error)
+                    OutlineButton(label = "Tentar novamente", onClick = onRetryTerms)
+                }
+                else -> {
+                    ConsentRow(
+                        checked = state.aceitouTermos,
+                        onCheckedChange = onToggleTermos,
+                        title = "Li e aceito os Termos de Uso e o Aviso de Privacidade da BLIQ.",
+                        subtitle = "Aceite obrigatório para criar o cadastro e utilizar os serviços." +
+                            (state.termos?.let { " Versão ${it.versao}." } ?: ""),
+                        required = true,
+                    )
+                    TextButton(onClick = onOpenTerms, modifier = Modifier.padding(start = 32.dp)) {
+                        Text("Ler termos completos", fontFamily = Epilogue, fontSize = 13.sp, color = Primary)
+                    }
+
+                    HorizontalDivider(color = PrimaryLight)
+
+                    ConsentRow(
+                        checked = state.aceitaMarketing,
+                        onCheckedChange = onToggleMarketing,
+                        title = "Quero receber promoções, ofertas e pesquisas da BLIQ por WhatsApp, SMS ou ligação.",
+                        subtitle = "Opcional. Pode ser cancelado a qualquer momento, sem impedir o uso dos serviços.",
+                        required = false,
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ConsentRow(
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+    title: String,
+    subtitle: String,
+    required: Boolean,
+) {
+    val titleAnnotated = remember(title, required) {
+        androidx.compose.ui.text.buildAnnotatedString {
+            append(title)
+            if (required) {
+                append(' ')
+                pushStyle(
+                    androidx.compose.ui.text.SpanStyle(
+                        color = Error,
+                        fontSize = 12.sp,
+                    )
+                )
+                append("(obrigatório)")
+                pop()
+            }
+        }
+    }
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .pointerInput(checked) { detectTapGestures { onCheckedChange(!checked) } },
+        verticalAlignment = Alignment.Top,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Checkbox(
+            checked = checked,
+            onCheckedChange = onCheckedChange,
+            colors = CheckboxDefaults.colors(checkedColor = Primary),
+        )
+        Column(
+            verticalArrangement = Arrangement.spacedBy(2.dp),
+            modifier = Modifier
+                .weight(1f)
+                .padding(top = 12.dp),
+        ) {
+            Text(
+                text = titleAnnotated,
+                fontFamily = Epilogue,
+                fontSize = 14.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = OnSurface,
+                lineHeight = 20.sp,
+            )
+            Text(
+                subtitle,
+                fontFamily = Epilogue,
+                fontSize = 12.sp,
+                color = Secondary,
+                lineHeight = 17.sp,
+            )
+        }
+    }
+}
+
+@Composable
+private fun TermsDialog(termos: br.com.bliqbrasil.totem.data.model.TermosAtual?, onDismiss: () -> Unit) {
+    if (termos == null) return
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        confirmButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Fechar", fontFamily = Epilogue, color = Primary, fontWeight = FontWeight.SemiBold)
+            }
+        },
+        title = {
+            Text(
+                "Termos de Uso e Aviso de Privacidade",
+                fontFamily = FugazOne,
+                fontSize = 18.sp,
+                color = OnSurface,
+            )
+        },
+        text = {
+            Column(
+                modifier = Modifier
+                    .heightIn(max = 480.dp)
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                Text(
+                    "Versão ${termos.versao} — publicado em ${termos.publicadoEm.take(10)}",
+                    fontFamily = Epilogue,
+                    fontSize = 12.sp,
+                    color = Secondary,
+                )
+                Text(termos.conteudo, fontFamily = Epilogue, fontSize = 13.sp, color = OnSurface, lineHeight = 19.sp)
+            }
+        },
+        containerColor = Surface,
+    )
 }
 
 @Composable
