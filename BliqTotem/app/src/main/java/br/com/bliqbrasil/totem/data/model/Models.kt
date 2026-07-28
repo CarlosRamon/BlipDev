@@ -67,6 +67,15 @@ data class CicloAtivo(
     val segundosRestantes: Int,
 )
 
+// ── Termos de Uso ──────────────────────────────────────────────────────────
+
+data class TermosAtual(
+    val versao: String,
+    val publicadoEm: String,
+    val conteudo: String,
+    val pdfUrl: String?,
+)
+
 // ── Cliente ────────────────────────────────────────────────────────────────
 
 data class Cliente(
@@ -101,6 +110,9 @@ data class CriarClienteRequest(
     val nome: String,
     val telefone: String,
     val email: String? = null,
+    val termosVersao: String,
+    val aceitaMarketing: Boolean = false,
+    val aceitaUsoImagem: Boolean = false,
 )
 
 data class AdicionarExtraRequest(val produtoExtraId: String)

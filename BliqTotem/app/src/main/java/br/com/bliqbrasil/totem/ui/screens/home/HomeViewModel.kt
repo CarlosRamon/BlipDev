@@ -28,8 +28,6 @@ class HomeViewModel(
     private val tokenStorage: TokenStorage,
 ) : AndroidViewModel(application) {
 
-    enum class PingState { IDLE, CONNECTING, CONNECTED }
-
     data class UiState(
         val config: PosConfig? = null,
         val washOptions: List<WashOption> = emptyList(),
@@ -38,8 +36,6 @@ class HomeViewModel(
         val error: String? = null,
         val needsActivation: Boolean = false,
         val activeSession: ActiveSession? = null,
-        val showWelcome: Boolean = true,
-        val pingState: PingState = PingState.IDLE,
     )
 
     data class ActiveSession(
@@ -166,21 +162,6 @@ class HomeViewModel(
             caps.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) -> Pair("MOBILE", null)
             caps.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET) -> Pair("ETHERNET", null)
             else -> Pair("NONE", null)
-        }
-    }
-
-    fun dismissWelcome() {
-        viewModelScope.launch {
-            _state.update { it.copy(pingState = PingState.CONNECTING) }
-            try {
-                bleManager.waitForConnection(timeoutMs = 15_000L)
-            } catch (e: Exception) {
-                _state.update { it.copy(pingState = PingState.IDLE) }
-                return@launch
-            }
-            _state.update { it.copy(pingState = PingState.CONNECTED) }
-            delay(1_200)
-            _state.update { it.copy(showWelcome = false, pingState = PingState.IDLE) }
         }
     }
 

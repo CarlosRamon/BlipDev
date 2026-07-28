@@ -30,6 +30,9 @@ interface ApiService {
     @PATCH("/api/pos/ciclos/{cicloId}/finalizar")
     suspend fun finalizarCiclo(@Path("cicloId") cicloId: String): Ciclo
 
+    @GET("/api/pos/termos/atual")
+    suspend fun getTermosAtual(): TermosAtual
+
     @GET("/api/pos/cliente/{cpf}")
     suspend fun buscarCliente(@Path("cpf") cpf: String): ClienteLookupResponse
 

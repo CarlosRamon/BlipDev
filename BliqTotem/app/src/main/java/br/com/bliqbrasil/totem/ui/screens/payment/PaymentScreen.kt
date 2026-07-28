@@ -21,9 +21,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.material3.Icon
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import br.com.bliqbrasil.totem.data.model.PaymentMethod
 import br.com.bliqbrasil.totem.payment.stone.PaymentState
+import br.com.bliqbrasil.totem.ui.components.BliqIcons
 import br.com.bliqbrasil.totem.ui.components.OutlineButton
 import br.com.bliqbrasil.totem.ui.components.PrimaryButton
 import br.com.bliqbrasil.totem.ui.theme.*
@@ -65,20 +67,26 @@ fun PaymentScreen(
             )
 
             is PaymentState.WaitingPassword -> StatusContent(
-                icon     = "🔒",
+                icon     = BliqIcons.Lock,
+                iconTint = Primary,
+                iconBg   = PrimaryLight,
                 title    = "Digite sua senha",
                 subtitle = "Use o teclado da maquininha",
             )
 
             is PaymentState.Sending,
             is PaymentState.WaitingRemoveCard -> StatusContent(
-                icon     = "⚡",
+                icon     = BliqIcons.Speed,
+                iconTint = Primary,
+                iconBg   = PrimaryLight,
                 title    = "Processando...",
                 subtitle = "Aguarde a confirmação",
             )
 
             is PaymentState.Success -> StatusContent(
-                icon        = "✅",
+                icon        = BliqIcons.CheckCircle,
+                iconTint    = Success,
+                iconBg      = SuccessLight,
                 title       = "Aprovado!",
                 subtitle    = if (uiState.isCreatingCiclo) "Registrando ciclo..." else "Concluído",
                 showSpinner = uiState.isCreatingCiclo,
@@ -91,7 +99,9 @@ fun PaymentScreen(
             )
 
             is PaymentState.Cancelled -> StatusContent(
-                icon     = "🚫",
+                icon     = BliqIcons.Cancel,
+                iconTint = Warning,
+                iconBg   = WarningLight,
                 title    = "Cancelado",
                 subtitle = "Pagamento cancelado",
             )
@@ -103,18 +113,25 @@ fun PaymentScreen(
                 shape = RoundedCornerShape(20.dp),
                 color = Primary.copy(alpha = 0.1f),
             ) {
-                Text(
-                    text = when (viewModel.paymentMethod) {
-                        PaymentMethod.CREDIT -> "💳 Crédito"
-                        PaymentMethod.DEBIT  -> "🏦 Débito"
-                        PaymentMethod.PIX    -> "⚡ Pix"
-                    },
-                    fontFamily = Epilogue,
-                    fontWeight = FontWeight.SemiBold,
-                    fontSize   = 14.sp,
-                    color      = Primary,
-                    modifier   = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-                )
+                val (icon, label) = when (viewModel.paymentMethod) {
+                    PaymentMethod.CREDIT -> BliqIcons.Credit to "Crédito"
+                    PaymentMethod.DEBIT  -> BliqIcons.Debit  to "Débito"
+                    PaymentMethod.PIX    -> BliqIcons.Pix    to "Pix"
+                }
+                androidx.compose.foundation.layout.Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                ) {
+                    Icon(imageVector = icon, contentDescription = null, tint = Primary, modifier = Modifier.size(18.dp))
+                    Text(
+                        text = label,
+                        fontFamily = Epilogue,
+                        fontWeight = FontWeight.SemiBold,
+                        fontSize   = 14.sp,
+                        color      = Primary,
+                    )
+                }
             }
         }
     }
@@ -141,11 +158,16 @@ private fun WaitingCardContent(onCancel: () -> Unit) {
         Box(
             contentAlignment = Alignment.Center,
             modifier = Modifier
-                .size(120.dp)
+                .size(140.dp)
                 .clip(CircleShape)
-                .background(Primary.copy(alpha = alpha * 0.15f)),
+                .background(Primary.copy(alpha = alpha * 0.18f)),
         ) {
-            Text("💳", fontSize = 52.sp)
+            Icon(
+                imageVector = BliqIcons.Contactless,
+                contentDescription = null,
+                tint = Primary,
+                modifier = Modifier.size(72.dp),
+            )
         }
 
         Text(
@@ -223,19 +245,29 @@ private fun WaitingQrCodeContent(state: PaymentState.WaitingQrCode, onCancel: ()
 
 @Composable
 private fun StatusContent(
-    icon: String,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    iconTint: androidx.compose.ui.graphics.Color,
+    iconBg: androidx.compose.ui.graphics.Color,
     title: String,
     subtitle: String,
     showSpinner: Boolean = false,
 ) {
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(16.dp),
+        verticalArrangement = Arrangement.spacedBy(20.dp),
         modifier = Modifier.padding(32.dp),
     ) {
-        Text(icon, fontSize = 64.sp)
-        Text(title, fontFamily = FugazOne, fontSize = 24.sp, color = OnSurface, textAlign = TextAlign.Center)
-        Text(subtitle, fontFamily = Epilogue, fontSize = 15.sp, color = Secondary, textAlign = TextAlign.Center)
+        Box(
+            contentAlignment = Alignment.Center,
+            modifier = Modifier
+                .size(120.dp)
+                .clip(CircleShape)
+                .background(iconBg),
+        ) {
+            Icon(imageVector = icon, contentDescription = null, tint = iconTint, modifier = Modifier.size(64.dp))
+        }
+        Text(title, fontFamily = FugazOne, fontSize = 28.sp, color = OnSurface, textAlign = TextAlign.Center)
+        Text(subtitle, fontFamily = Epilogue, fontSize = 16.sp, color = Secondary, textAlign = TextAlign.Center)
         if (showSpinner) {
             CircularProgressIndicator(color = Primary, modifier = Modifier.size(32.dp), strokeWidth = 3.dp)
         }
@@ -246,12 +278,20 @@ private fun StatusContent(
 private fun FailureContent(message: String, onRetry: () -> Unit, onBack: () -> Unit) {
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(16.dp),
+        verticalArrangement = Arrangement.spacedBy(20.dp),
         modifier = Modifier.padding(32.dp),
     ) {
-        Text("❌", fontSize = 64.sp)
-        Text("Não autorizada", fontFamily = FugazOne, fontSize = 24.sp, color = OnSurface, textAlign = TextAlign.Center)
-        Text(message, fontFamily = Epilogue, fontSize = 15.sp, color = Secondary, textAlign = TextAlign.Center)
+        Box(
+            contentAlignment = Alignment.Center,
+            modifier = Modifier
+                .size(120.dp)
+                .clip(CircleShape)
+                .background(ErrorSurface),
+        ) {
+            Icon(imageVector = BliqIcons.Close, contentDescription = null, tint = Error, modifier = Modifier.size(64.dp))
+        }
+        Text("Não autorizada", fontFamily = FugazOne, fontSize = 28.sp, color = OnSurface, textAlign = TextAlign.Center)
+        Text(message, fontFamily = Epilogue, fontSize = 16.sp, color = Secondary, textAlign = TextAlign.Center)
         Spacer(Modifier.height(8.dp))
         PrimaryButton(label = "Tentar novamente", onClick = onRetry)
         OutlineButton(label = "Voltar ao checkout", onClick = onBack)

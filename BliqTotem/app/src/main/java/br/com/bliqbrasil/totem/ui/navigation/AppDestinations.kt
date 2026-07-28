@@ -9,22 +9,25 @@ import kotlinx.serialization.json.Json
 
 object AppDestinations {
     @Serializable object Activation
-    @Serializable object Home
+    @Serializable object Welcome
+    @Serializable object CpfInput
     @Serializable object Support
 
     @Serializable
-    data class MinutesPicker(val washOptionJson: String, val boxTipo: String = "LAVACAO")
+    data class Home(val clienteId: String = "")
 
     @Serializable
-    data class Extras(val washOptionJson: String, val boxTipo: String = "LAVACAO")
-
-    @Serializable
-    data class CpfInput(
+    data class MinutesPicker(
         val washOptionJson: String,
-        val selectedExtrasJson: String,
-        val totalMinutes: Int,
-        val totalPrice: Double,
         val boxTipo: String = "LAVACAO",
+        val clienteId: String = "",
+    )
+
+    @Serializable
+    data class Extras(
+        val washOptionJson: String,
+        val boxTipo: String = "LAVACAO",
+        val clienteId: String = "",
     )
 
     @Serializable

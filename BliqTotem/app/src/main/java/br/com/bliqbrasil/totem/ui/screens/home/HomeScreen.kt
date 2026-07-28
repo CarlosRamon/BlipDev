@@ -2,7 +2,6 @@ package br.com.bliqbrasil.totem.ui.screens.home
 
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.animation.core.*
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -15,8 +14,6 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.scale
-import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
@@ -26,8 +23,6 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import br.com.bliqbrasil.totem.BuildConfig
 import br.com.bliqbrasil.totem.R
-import br.com.bliqbrasil.totem.data.model.ConnectionStatus
-import br.com.bliqbrasil.totem.data.model.PosConfig
 import br.com.bliqbrasil.totem.data.model.WashOption
 import br.com.bliqbrasil.totem.data.model.WashOptionExtra
 import br.com.bliqbrasil.totem.ui.components.BleStatusBar
@@ -38,9 +33,10 @@ import br.com.bliqbrasil.totem.util.formatCurrency
 @Composable
 fun HomeScreen(
     viewModel: HomeViewModel,
-    onNavigateToExtras: (WashOption, boxTipo: String) -> Unit,
-    onNavigateToCheckout: (WashOption, List<WashOptionExtra>, Int, Double, boxTipo: String) -> Unit,
-    onNavigateToMinutesPicker: (WashOption, boxTipo: String) -> Unit,
+    clienteId: String,
+    onNavigateToExtras: (WashOption, boxTipo: String, clienteId: String) -> Unit,
+    onNavigateToCheckout: (WashOption, List<WashOptionExtra>, Int, Double, boxTipo: String, clienteId: String) -> Unit,
+    onNavigateToMinutesPicker: (WashOption, boxTipo: String, clienteId: String) -> Unit,
     onNavigateToSession: (cicloId: String, totalMinutes: Int, resumeFromSeconds: Int?, boxTipo: String) -> Unit,
     onNeedActivation: () -> Unit,
     onNavigateToSupport: () -> Unit,
@@ -50,7 +46,7 @@ fun HomeScreen(
     val bleError  by viewModel.bleManager.errorMessage.collectAsStateWithLifecycle()
     val bleManager = viewModel.bleManager
 
-    var logoTapCount by remember { mutableStateOf(0) }
+    var logoTapCount by remember { mutableIntStateOf(0) }
     var showResetDialog by remember { mutableStateOf(false) }
 
     LaunchedEffect(logoTapCount) {
@@ -80,16 +76,6 @@ fun HomeScreen(
             viewModel.consumeActiveSession()
             onNavigateToSession(session.cicloId, session.totalMinutes, session.resumeFromSeconds, session.boxTipo)
         }
-    }
-
-    if (state.showWelcome) {
-        WelcomeContent(
-            config    = state.config,
-            bleStatus = bleStatus,
-            pingState = state.pingState,
-            onStart   = viewModel::dismissWelcome,
-        )
-        return
     }
 
     if (showResetDialog) {
@@ -239,149 +225,13 @@ fun HomeScreen(
                     ProductCard(option = option, onClick = {
                         val boxTipo = state.boxTipo
                         when {
-                            option.tipo == "MINUTAGEM_AVULSA" -> onNavigateToMinutesPicker(option, boxTipo)
-                            option.extras.isNotEmpty() -> onNavigateToExtras(option, boxTipo)
-                            else -> onNavigateToCheckout(option, emptyList(), option.minutes, option.price, boxTipo)
+                            option.tipo == "MINUTAGEM_AVULSA" -> onNavigateToMinutesPicker(option, boxTipo, clienteId)
+                            option.extras.isNotEmpty() -> onNavigateToExtras(option, boxTipo, clienteId)
+                            else -> onNavigateToCheckout(option, emptyList(), option.minutes, option.price, boxTipo, clienteId)
                         }
                     })
                 }
             }
-        }
-    }
-}
-
-@Composable
-private fun WelcomeContent(
-    config: PosConfig?,
-    bleStatus: ConnectionStatus,
-    pingState: HomeViewModel.PingState,
-    onStart: () -> Unit,
-) {
-    val infiniteTransition = rememberInfiniteTransition(label = "pulse")
-    val scale by infiniteTransition.animateFloat(
-        initialValue = 1f,
-        targetValue  = 1.06f,
-        animationSpec = infiniteRepeatable(
-            animation  = tween(900, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Reverse,
-        ),
-        label = "scale",
-    )
-
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Primary),
-        contentAlignment = Alignment.Center,
-    ) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(28.dp),
-            modifier = Modifier.padding(horizontal = 48.dp),
-        ) {
-            Image(
-                painter          = painterResource(R.drawable.bliq_tagline),
-                contentDescription = "Bliq",
-                modifier         = Modifier.fillMaxWidth(0.65f),
-                colorFilter      = ColorFilter.tint(Surface),
-            )
-
-            config?.let { cfg ->
-                Text(
-                    text       = cfg.box.nome,
-                    fontSize   = 18.sp,
-                    fontFamily = FugazOne,
-                    color      = Surface.copy(alpha = 0.8f),
-                    textAlign  = TextAlign.Center,
-                )
-            }
-
-            when (pingState) {
-                HomeViewModel.PingState.IDLE -> {
-                    Button(
-                        onClick  = onStart,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(56.dp)
-                            .scale(scale),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = Surface,
-                            contentColor   = Primary,
-                        ),
-                        shape = RoundedCornerShape(14.dp),
-                    ) {
-                        Text(
-                            "Toque para iniciar",
-                            fontFamily = Epilogue,
-                            fontSize   = 17.sp,
-                            fontWeight = FontWeight.SemiBold,
-                        )
-                    }
-                }
-
-                HomeViewModel.PingState.CONNECTING -> {
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(16.dp),
-                    ) {
-                        CircularProgressIndicator(
-                            color       = Surface,
-                            strokeWidth = 3.dp,
-                            modifier    = Modifier.size(40.dp),
-                        )
-                        Text(
-                            "Conectando equipamento...",
-                            fontFamily  = Epilogue,
-                            fontSize    = 17.sp,
-                            fontWeight  = FontWeight.SemiBold,
-                            color       = Surface,
-                            textAlign   = TextAlign.Center,
-                        )
-                    }
-                }
-
-                HomeViewModel.PingState.CONNECTED -> {
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(16.dp),
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .size(48.dp)
-                                .background(Success, RoundedCornerShape(24.dp)),
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            Text("✓", fontSize = 24.sp, color = Surface, fontWeight = FontWeight.Bold)
-                        }
-                        Text(
-                            "Equipamento conectado!",
-                            fontFamily  = Epilogue,
-                            fontSize    = 17.sp,
-                            fontWeight  = FontWeight.SemiBold,
-                            color       = Surface,
-                            textAlign   = TextAlign.Center,
-                        )
-                    }
-                }
-            }
-        }
-
-        val (dot, label) = when (bleStatus) {
-            ConnectionStatus.CONNECTED    -> "●" to "Equipamento conectado"
-            ConnectionStatus.SCANNING,
-            ConnectionStatus.CONNECTING   -> "◌" to "Conectando ao equipamento..."
-            ConnectionStatus.RECONNECTING -> "◌" to "Reconectando..."
-            else                          -> "○" to "Aguardando equipamento"
-        }
-        Row(
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .padding(bottom = 28.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
-        ) {
-            Text(dot,   fontSize = 10.sp, color = Surface.copy(alpha = 0.5f))
-            Text(label, fontFamily = Epilogue, fontSize = 13.sp, color = Surface.copy(alpha = 0.5f))
         }
     }
 }

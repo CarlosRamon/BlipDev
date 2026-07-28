@@ -14,18 +14,21 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import br.com.bliqbrasil.totem.data.model.PaymentMethod
+import br.com.bliqbrasil.totem.ui.components.BliqIconChip
+import br.com.bliqbrasil.totem.ui.components.BliqIcons
 import br.com.bliqbrasil.totem.ui.components.PrimaryButton
 import br.com.bliqbrasil.totem.ui.theme.*
 import br.com.bliqbrasil.totem.util.formatCurrency
 
-private data class PaymentOption(val method: PaymentMethod, val label: String, val icon: String)
+private data class PaymentOption(val method: PaymentMethod, val label: String, val icon: ImageVector)
 
 private val PAYMENT_OPTIONS = listOf(
-    PaymentOption(PaymentMethod.CREDIT, "Crédito", "💳"),
-    PaymentOption(PaymentMethod.DEBIT,  "Débito",  "🏦"),
-    PaymentOption(PaymentMethod.PIX,    "Pix",     "⚡"),
+    PaymentOption(PaymentMethod.CREDIT, "Crédito", BliqIcons.Credit),
+    PaymentOption(PaymentMethod.DEBIT,  "Débito",  BliqIcons.Debit),
+    PaymentOption(PaymentMethod.PIX,    "Pix",     BliqIcons.Pix),
 )
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -140,10 +143,16 @@ private fun PaymentCard(
         Column(
             modifier = Modifier.padding(16.dp).fillMaxWidth(),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(6.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            Text(option.icon, fontSize = 28.sp)
-            Text(option.label, fontFamily = Epilogue, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = if (isSelected) Primary else Secondary)
+            BliqIconChip(
+                icon = option.icon,
+                size = 52.dp,
+                tint = if (isSelected) Surface else Primary,
+                background = if (isSelected) Primary else PrimaryLight,
+                contentDescription = option.label,
+            )
+            Text(option.label, fontFamily = Epilogue, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = if (isSelected) Primary else Secondary)
             if (isSelected) {
                 Surface(shape = CircleShape, color = Primary, modifier = Modifier.size(8.dp)) {}
             }

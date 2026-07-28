@@ -25,13 +25,14 @@ import br.com.bliqbrasil.totem.ui.screens.session.SessionScreen
 import br.com.bliqbrasil.totem.ui.screens.session.SessionViewModel
 import br.com.bliqbrasil.totem.ui.screens.success.SuccessScreen
 import br.com.bliqbrasil.totem.ui.screens.success.SuccessViewModel
+import br.com.bliqbrasil.totem.ui.screens.welcome.WelcomeScreen
+import br.com.bliqbrasil.totem.ui.screens.welcome.WelcomeViewModel
 
 @Composable
 fun NavGraph(navController: NavHostController, app: BliqTotemApp) {
 
-
     val startDestination: Any = if (app.tokenStorage.getToken() != null)
-        AppDestinations.Home else AppDestinations.Activation
+        AppDestinations.Welcome else AppDestinations.Activation
 
     NavHost(navController = navController, startDestination = startDestination) {
 
@@ -42,33 +43,81 @@ fun NavGraph(navController: NavHostController, app: BliqTotemApp) {
             ActivationScreen(
                 viewModel = vm,
                 onActivated = {
-                    navController.navigate(AppDestinations.Home) {
+                    navController.navigate(AppDestinations.Welcome) {
                         popUpTo(AppDestinations.Activation) { inclusive = true }
                     }
                 }
             )
         }
 
-        composable<AppDestinations.Home> {
+        composable<AppDestinations.Welcome> {
+            val vm = viewModel<WelcomeViewModel>(
+                factory = WelcomeViewModel.factory(app.repository, app.bleManager, app.tokenStorage)
+            )
+            WelcomeScreen(
+                viewModel = vm,
+                onStartFlow = { navController.navigate(AppDestinations.CpfInput) },
+                onNeedActivation = {
+                    navController.navigate(AppDestinations.Activation) {
+                        popUpTo(0) { inclusive = true }
+                    }
+                },
+                onResumeSession = { cicloId, totalMinutes, resumeFromSeconds, boxTipo ->
+                    navController.navigate(
+                        AppDestinations.Session(
+                            cicloId           = cicloId,
+                            totalMinutes      = totalMinutes,
+                            boxTipo           = boxTipo,
+                            resumeFromSeconds = resumeFromSeconds,
+                        )
+                    ) { popUpTo(0) { inclusive = true } }
+                },
+            )
+        }
+
+        composable<AppDestinations.CpfInput> {
+            val vm = viewModel<CpfInputViewModel>(
+                factory = CpfInputViewModel.factory(app.repository)
+            )
+            CpfInputScreen(
+                viewModel = vm,
+                onBack = {
+                    // Voltar do CPF cancela a intenção e volta pro Welcome
+                    navController.navigate(AppDestinations.Welcome) {
+                        popUpTo(AppDestinations.Welcome) { inclusive = true }
+                    }
+                },
+                onContinue = { clienteId ->
+                    navController.navigate(AppDestinations.Home(clienteId = clienteId)) {
+                        popUpTo(AppDestinations.CpfInput) { inclusive = true }
+                    }
+                }
+            )
+        }
+
+        composable<AppDestinations.Home> { entry ->
+            val route = entry.toRoute<AppDestinations.Home>()
             val vm = viewModel<HomeViewModel>(
                 factory = HomeViewModel.factory(app, app.repository, app.bleManager, app.tokenStorage)
             )
             HomeScreen(
                 viewModel = vm,
-                onNavigateToExtras = { option, boxTipo ->
-                    navController.navigate(AppDestinations.Extras(option.toJson(), boxTipo))
+                clienteId = route.clienteId,
+                onNavigateToExtras = { option, boxTipo, clienteId ->
+                    navController.navigate(AppDestinations.Extras(option.toJson(), boxTipo, clienteId))
                 },
-                onNavigateToMinutesPicker = { option, boxTipo ->
-                    navController.navigate(AppDestinations.MinutesPicker(option.toJson(), boxTipo))
+                onNavigateToMinutesPicker = { option, boxTipo, clienteId ->
+                    navController.navigate(AppDestinations.MinutesPicker(option.toJson(), boxTipo, clienteId))
                 },
-                onNavigateToCheckout = { option, extras, minutes, price, boxTipo ->
+                onNavigateToCheckout = { option, extras, minutes, price, boxTipo, clienteId ->
                     navController.navigate(
-                        AppDestinations.CpfInput(
+                        AppDestinations.Checkout(
                             washOptionJson     = option.toJson(),
                             selectedExtrasJson = extras.toJson(),
                             totalMinutes       = minutes,
                             totalPrice         = price,
                             boxTipo            = boxTipo,
+                            clienteId          = clienteId,
                         )
                     )
                 },
@@ -80,7 +129,7 @@ fun NavGraph(navController: NavHostController, app: BliqTotemApp) {
                             boxTipo            = boxTipo,
                             resumeFromSeconds  = resumeFromSeconds,
                         )
-                    ) { popUpTo(AppDestinations.Home) { inclusive = false } }
+                    ) { popUpTo(AppDestinations.Home::class) { inclusive = false } }
                 },
                 onNeedActivation = {
                     navController.navigate(AppDestinations.Activation) {
@@ -101,12 +150,13 @@ fun NavGraph(navController: NavHostController, app: BliqTotemApp) {
                 onBack = { navController.popBackStack() },
                 onContinue = { minutes, totalPrice ->
                     navController.navigate(
-                        AppDestinations.CpfInput(
+                        AppDestinations.Checkout(
                             washOptionJson     = washOption.toJson(),
                             selectedExtrasJson = emptyList<WashOptionExtra>().toJson(),
                             totalMinutes       = minutes,
                             totalPrice         = totalPrice,
                             boxTipo            = route.boxTipo,
+                            clienteId          = route.clienteId,
                         )
                     )
                 }
@@ -121,37 +171,15 @@ fun NavGraph(navController: NavHostController, app: BliqTotemApp) {
                 onBack = { navController.popBackStack() },
                 onContinue = { extras, minutes, price ->
                     navController.navigate(
-                        AppDestinations.CpfInput(
+                        AppDestinations.Checkout(
                             washOptionJson     = washOption.toJson(),
                             selectedExtrasJson = extras.toJson(),
                             totalMinutes       = minutes,
                             totalPrice         = price,
                             boxTipo            = route.boxTipo,
+                            clienteId          = route.clienteId,
                         )
                     )
-                }
-            )
-        }
-
-        composable<AppDestinations.CpfInput> { entry ->
-            val route = entry.toRoute<AppDestinations.CpfInput>()
-            val vm = viewModel<CpfInputViewModel>(
-                factory = CpfInputViewModel.factory(app.repository)
-            )
-            CpfInputScreen(
-                viewModel = vm,
-                onBack = { navController.popBackStack() },
-                onContinue = { clienteId ->
-                    navController.navigate(
-                        AppDestinations.Checkout(
-                            washOptionJson     = route.washOptionJson,
-                            selectedExtrasJson = route.selectedExtrasJson,
-                            totalMinutes       = route.totalMinutes,
-                            totalPrice         = route.totalPrice,
-                            boxTipo            = route.boxTipo,
-                            clienteId          = clienteId,
-                        )
-                    ) { popUpTo(AppDestinations.CpfInput::class) { inclusive = true } }
                 }
             )
         }
@@ -246,7 +274,7 @@ fun NavGraph(navController: NavHostController, app: BliqTotemApp) {
                     ) { popUpTo(AppDestinations.Success::class) { inclusive = true } }
                 },
                 onBackToHome = {
-                    navController.navigate(AppDestinations.Home) {
+                    navController.navigate(AppDestinations.Welcome) {
                         popUpTo(0) { inclusive = true }
                     }
                 }
@@ -268,7 +296,7 @@ fun NavGraph(navController: NavHostController, app: BliqTotemApp) {
             SessionScreen(
                 viewModel  = vm,
                 onFinished = {
-                    navController.navigate(AppDestinations.Home) {
+                    navController.navigate(AppDestinations.Welcome) {
                         popUpTo(0) { inclusive = true }
                     }
                 }
