@@ -66,7 +66,7 @@ fun ExtrasScreen(
                 Card(shape = RoundedCornerShape(14.dp), elevation = CardDefaults.cardElevation(2.dp), colors = CardDefaults.cardColors(containerColor = Surface)) {
                     Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                            Text("Lavagem", fontFamily = Epilogue, color = Secondary, fontSize = 14.sp)
+                            Text("Serviço", fontFamily = Epilogue, color = Secondary, fontSize = 14.sp)
                             Text(washOption.label, fontFamily = Epilogue, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
                         }
                         HorizontalDivider(color = Divider)
