@@ -379,7 +379,7 @@ private fun ConsentsCard(
         elevation = CardDefaults.cardElevation(2.dp),
         colors = CardDefaults.cardColors(containerColor = Surface),
     ) {
-        Column(modifier = Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             when {
                 state.termosLoading -> {
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -400,7 +400,11 @@ private fun ConsentsCard(
                             (state.termos?.let { " Versão ${it.versao}." } ?: ""),
                         required = true,
                     )
-                    TextButton(onClick = onOpenTerms, modifier = Modifier.padding(start = 32.dp)) {
+                    TextButton(
+                        onClick = onOpenTerms,
+                        modifier = Modifier.padding(start = 24.dp),
+                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+                    ) {
                         Text("Ler termos completos", fontFamily = Epilogue, fontSize = 13.sp, color = Primary)
                     }
 
@@ -448,18 +452,21 @@ private fun ConsentRow(
             .fillMaxWidth()
             .pointerInput(checked) { detectTapGestures { onCheckedChange(!checked) } },
         verticalAlignment = Alignment.Top,
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
     ) {
-        Checkbox(
-            checked = checked,
-            onCheckedChange = onCheckedChange,
-            colors = CheckboxDefaults.colors(checkedColor = Primary),
-        )
+        CompositionLocalProvider(LocalMinimumInteractiveComponentSize provides 0.dp) {
+            Checkbox(
+                checked = checked,
+                onCheckedChange = onCheckedChange,
+                colors = CheckboxDefaults.colors(checkedColor = Primary),
+                modifier = Modifier.padding(top = 2.dp),
+            )
+        }
         Column(
             verticalArrangement = Arrangement.spacedBy(2.dp),
             modifier = Modifier
                 .weight(1f)
-                .padding(top = 12.dp),
+                .padding(top = 2.dp),
         ) {
             Text(
                 text = titleAnnotated,
