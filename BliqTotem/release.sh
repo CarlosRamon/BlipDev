@@ -17,7 +17,7 @@ echo "→ Build release de todos os flavors..."
 
 echo "→ Copiando APKs para $DEST..."
 mkdir -p "$DEST"
-find app/build/outputs/apk -name "*release*.apk" -exec cp {} "$DEST/" \;
+find app/build/outputs/apk -name "*release*.apk" -not -name "*unsigned*" -exec cp {} "$DEST/" \;
 
 echo "→ Compactando em releases/$VERSION.rar..."
 cd releases
