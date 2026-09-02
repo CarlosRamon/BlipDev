@@ -5,11 +5,16 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Air
 import androidx.compose.material.icons.filled.Bolt
+import androidx.compose.material.icons.filled.BubbleChart
 import androidx.compose.material.icons.filled.Cancel
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Shower
+import androidx.compose.material.icons.filled.WaterDrop
+import androidx.compose.material.icons.filled.Waves
 import androidx.compose.material.icons.filled.Contactless
 import androidx.compose.material.icons.filled.CreditCard
 import androidx.compose.material.icons.filled.ErrorOutline
@@ -26,6 +31,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import br.com.bliqbrasil.totem.data.model.Machine
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import br.com.bliqbrasil.totem.ui.theme.Primary
@@ -51,6 +57,14 @@ object BliqIcons {
     val Help: ImageVector      = Icons.Filled.HelpOutline
     val Speed: ImageVector     = Icons.Filled.Speed
     val Touch: ImageVector     = Icons.Filled.TouchApp
+
+    // Ícones das máquinas do box — substituem os emoji do enum Machine,
+    // que o brandbook proíbe na interface.
+    val PreLavagem: ImageVector   = Icons.Filled.WaterDrop
+    val Shampoo: ImageVector      = Icons.Filled.BubbleChart
+    val Enxague: ImageVector      = Icons.Filled.Shower
+    val Aspirador: ImageVector    = Icons.Filled.Air
+    val ArComprimido: ImageVector = Icons.Filled.Waves
 }
 
 /**
@@ -82,4 +96,13 @@ fun BliqIconChip(
                 .padding(0.dp),
         )
     }
+}
+
+/** Ícone vetorial de cada máquina, conforme os mockups do Figma. */
+fun machineIcon(machine: Machine): ImageVector = when (machine) {
+    Machine.PRE_LAVAGEM   -> BliqIcons.PreLavagem
+    Machine.SHAMPOO       -> BliqIcons.Shampoo
+    Machine.ENXAGUE       -> BliqIcons.Enxague
+    Machine.ASPIRADOR     -> BliqIcons.Aspirador
+    Machine.AR_COMPRIMIDO -> BliqIcons.ArComprimido
 }

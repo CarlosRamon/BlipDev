@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import br.com.bliqbrasil.totem.bluetooth.BliqBleManager
 import br.com.bliqbrasil.totem.data.local.TokenStorage
+import br.com.bliqbrasil.totem.data.model.PoliticaCpf
 import br.com.bliqbrasil.totem.data.model.PosConfig
 import br.com.bliqbrasil.totem.data.repository.PosRepository
 import kotlinx.coroutines.delay
@@ -26,6 +27,7 @@ class WelcomeViewModel(
         val pingState: PingState = PingState.IDLE,
         val needsActivation: Boolean = false,
         val activeSession: ActiveSession? = null,
+        val politicaCpf: PoliticaCpf = PoliticaCpf.OPCIONAL,
     )
 
     data class ActiveSession(
@@ -51,7 +53,11 @@ class WelcomeViewModel(
                 val chrUuid  = config.esp32.charUuid    ?: config.esp32.uuid
                 if (svcUuid != null && chrUuid != null) bleManager.setUuids(svcUuid, chrUuid)
                 config.esp32.uuid?.let { bleManager.setDeviceName(it) }
-                _state.update { it.copy(config = config) }
+                tokenStorage.saveBoxTipo(config.box.tipo)
+                tokenStorage.savePoliticaCpf(config.franqueado.politicaCpf)
+                _state.update {
+                    it.copy(config = config, politicaCpf = PoliticaCpf.from(config.franqueado.politicaCpf))
+                }
 
                 // Sessão ativa: pula welcome/CPF e vai direto pra Session
                 repository.getCicloAtivo().getOrNull()?.let { ciclo ->

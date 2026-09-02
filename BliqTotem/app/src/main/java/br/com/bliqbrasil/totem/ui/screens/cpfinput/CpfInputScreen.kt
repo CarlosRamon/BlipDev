@@ -31,6 +31,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import br.com.bliqbrasil.totem.data.model.PoliticaCpf
 import br.com.bliqbrasil.totem.ui.components.OutlineButton
 import br.com.bliqbrasil.totem.ui.components.PrimaryButton
 import br.com.bliqbrasil.totem.ui.screens.cpfinput.CpfInputViewModel.Companion.maskCpf
@@ -110,9 +111,12 @@ fun CpfInputScreen(
     onBack: () -> Unit,
     onContinue: (clienteId: String) -> Unit,
 ) {
+    val palette = LocalBoxPalette.current
+
     val state by viewModel.state.collectAsStateWithLifecycle()
 
     Scaffold(
+        contentWindowInsets = WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom),
         topBar = {
             TopAppBar(
                 title = { Text("Identificação", fontFamily = FugazOne) },
@@ -121,10 +125,10 @@ fun CpfInputScreen(
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Voltar", tint = Surface)
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = Primary, titleContentColor = Surface),
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = palette.contrast, titleContentColor = palette.onContrast),
             )
         },
-        containerColor = Background,
+        containerColor = palette.background,
     ) { padding ->
         Box(
             modifier = Modifier
@@ -151,64 +155,77 @@ private fun EnteringCpfContent(
     viewModel: CpfInputViewModel,
     onSkip: () -> Unit,
 ) {
+    val palette = LocalBoxPalette.current
     val keyboard = LocalSoftwareKeyboardController.current
     val focusRequester = remember { FocusRequester() }
 
     LaunchedEffect(Unit) { focusRequester.requestFocus() }
 
+    // Sem card: no Figma o conteúdo fica direto sobre o fundo da tela e só o
+    // campo de entrada é branco.
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .verticalScroll(rememberScrollState())
-            .padding(top = 40.dp),
-        verticalArrangement = Arrangement.spacedBy(24.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
+            .padding(top = 28.dp, bottom = BliqDimens.BottomSafeGap),
+        verticalArrangement = Arrangement.spacedBy(20.dp),
+        horizontalAlignment = Alignment.Start,
     ) {
-        Text("Digite seu CPF", fontFamily = FugazOne, fontSize = 28.sp, color = OnSurface)
         Text(
-            "Identifica sua conta para agilizar futuros atendimentos.\nSeus dados são tratados conforme a LGPD (Lei 13.709/2018).",
+            "DIGITE SEU CPF",
+            fontFamily = FugazOne,
+            fontSize = 28.sp,
+            color = palette.onBackground,
+        )
+        Text(
+            "Identifica sua conta para agilizar futuros atendimentos. Seus dados são tratados conforme a LGPD (Lei 13.709/2018).",
             fontFamily = Epilogue,
-            fontSize = 14.sp,
-            color = Secondary,
-            textAlign = TextAlign.Center,
-            lineHeight = 20.sp,
+            fontSize = 16.sp,
+            color = palette.onBackground,
+            lineHeight = 23.sp,
         )
 
-        Card(
-            shape = RoundedCornerShape(16.dp),
-            elevation = CardDefaults.cardElevation(2.dp),
-            colors = CardDefaults.cardColors(containerColor = Surface),
-            modifier = Modifier.fillMaxWidth(),
-        ) {
-            Column(modifier = Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text(
-                    "CPF",
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+            Text(
+                "CPF",
+                fontFamily = Epilogue,
+                fontWeight = FontWeight.Bold,
+                fontSize = 13.sp,
+                color = palette.onBackground,
+                letterSpacing = 0.5.sp,
+            )
+            OutlinedTextField(
+                value = state.cpf,
+                onValueChange = { viewModel.updateCpf(it) },
+                visualTransformation = CpfVisualTransformation(),
+                placeholder = { Text("000.000.000-00", fontFamily = Epilogue, color = Tertiary) },
+                singleLine = true,
+                textStyle = androidx.compose.ui.text.TextStyle(
                     fontFamily = Epilogue,
-                    fontWeight = FontWeight.SemiBold,
-                    fontSize = 13.sp,
-                    color = Secondary,
-                    letterSpacing = 0.5.sp,
-                )
-                OutlinedTextField(
-                    value = state.cpf,
-                    onValueChange = { viewModel.updateCpf(it) },
-                    visualTransformation = CpfVisualTransformation(),
-                    placeholder = { Text("000.000.000-00", fontFamily = Epilogue, color = Tertiary) },
-                    singleLine = true,
-                    keyboardOptions = KeyboardOptions(
-                        keyboardType = KeyboardType.Number,
-                        imeAction = ImeAction.Done,
-                    ),
-                    keyboardActions = KeyboardActions(onDone = { keyboard?.hide() }),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .focusRequester(focusRequester),
-                    shape = RoundedCornerShape(10.dp),
-                    isError = state.cpf.length == 11 && !validarCpf(state.cpf),
-                    supportingText = if (state.cpf.length == 11 && !validarCpf(state.cpf)) {
-                        { Text("CPF inválido", fontFamily = Epilogue, color = Error) }
-                    } else null,
-                )
+                    fontSize = 20.sp,
+                    color = palette.onSurface,
+                ),
+                keyboardOptions = KeyboardOptions(
+                    keyboardType = KeyboardType.Number,
+                    imeAction = ImeAction.Done,
+                ),
+                keyboardActions = KeyboardActions(onDone = { keyboard?.hide() }),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(64.dp)
+                    .focusRequester(focusRequester),
+                shape = RoundedCornerShape(16.dp),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedContainerColor   = palette.surface,
+                    unfocusedContainerColor = palette.surface,
+                    errorContainerColor     = palette.surface,
+                    focusedBorderColor      = androidx.compose.ui.graphics.Color.Transparent,
+                    unfocusedBorderColor    = androidx.compose.ui.graphics.Color.Transparent,
+                ),
+                isError = state.cpf.length == 11 && !validarCpf(state.cpf),
+            )
+            if (state.cpf.length == 11 && !validarCpf(state.cpf)) {
+                Text("CPF inválido", fontFamily = Epilogue, fontSize = 13.sp, color = palette.danger)
             }
         }
 
@@ -217,13 +234,19 @@ private fun EnteringCpfContent(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                CircularProgressIndicator(color = Primary, modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
-                Text("Buscando cadastro...", fontFamily = Epilogue, fontSize = 14.sp, color = Secondary)
+                CircularProgressIndicator(
+                    color = palette.onBackground,
+                    modifier = Modifier.size(20.dp),
+                    strokeWidth = 2.dp,
+                )
+                Text("Buscando cadastro...", fontFamily = Epilogue, fontSize = 15.sp, color = palette.onBackground)
             }
         }
 
-        Spacer(Modifier.height(8.dp))
-        OutlineButton(label = "Pular identificação", onClick = onSkip)
+        if (state.politicaCpf != PoliticaCpf.OBRIGATORIO) {
+            Spacer(Modifier.height(8.dp))
+            OutlineButton(label = "Pular identificação", onClick = onSkip)
+        }
     }
 }
 
@@ -233,13 +256,14 @@ private fun FoundContent(
     onContinue: () -> Unit,
     onSkip: () -> Unit,
 ) {
+    val palette = LocalBoxPalette.current
     val cliente = state.clienteEncontrado ?: return
 
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .verticalScroll(rememberScrollState())
-            .padding(top = 32.dp, bottom = 24.dp),
+            .padding(top = 32.dp, bottom = 24.dp + BliqDimens.BottomSafeGap),
         verticalArrangement = Arrangement.spacedBy(24.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
@@ -256,9 +280,9 @@ private fun FoundContent(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            Text("Bem-vindo de volta!", fontFamily = FugazOne, fontSize = 26.sp, color = OnSurface)
-            Text(cliente.nome, fontFamily = Epilogue, fontSize = 20.sp, fontWeight = FontWeight.SemiBold, color = Primary)
-            Text(maskCpf(cliente.cpf), fontFamily = Epilogue, fontSize = 15.sp, color = Secondary)
+            Text("BEM-VINDO DE VOLTA!", fontFamily = FugazOne, fontSize = 28.sp, color = palette.onBackground)
+            Text(cliente.nome, fontFamily = Epilogue, fontSize = 22.sp, fontWeight = FontWeight.Bold, color = palette.onBackground)
+            Text(maskCpf(cliente.cpf), fontFamily = Epilogue, fontSize = 16.sp, color = palette.onBackground.copy(alpha = 0.85f))
         }
 
         Spacer(Modifier.height(16.dp))
@@ -274,6 +298,7 @@ private fun NotFoundContent(
     onSuccess: (clienteId: String) -> Unit,
     onSkip: () -> Unit,
 ) {
+    val palette = LocalBoxPalette.current
     val keyboard = LocalSoftwareKeyboardController.current
     val focusManager = LocalFocusManager.current
     val isRegistering = state.step == CpfStep.REGISTERING
@@ -292,16 +317,16 @@ private fun NotFoundContent(
             .imePadding()
             .verticalScroll(rememberScrollState())
             .pointerInput(Unit) { detectTapGestures { focusManager.clearFocus() } }
-            .padding(top = 32.dp, bottom = 24.dp),
+            .padding(top = 32.dp, bottom = 24.dp + BliqDimens.BottomSafeGap),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        Text("Novo cadastro", fontFamily = FugazOne, fontSize = 26.sp, color = OnSurface)
+        Text("NOVO CADASTRO", fontFamily = FugazOne, fontSize = 28.sp, color = palette.onBackground)
         Text(
             "CPF não encontrado. Preencha seus dados para se cadastrar.",
             fontFamily = Epilogue,
-            fontSize = 14.sp,
-            color = Secondary,
-            lineHeight = 21.sp,
+            fontSize = 16.sp,
+            color = palette.onBackground,
+            lineHeight = 23.sp,
         )
 
         Card(
@@ -362,7 +387,9 @@ private fun NotFoundContent(
             enabled = canSubmit,
             loading = isRegistering,
         )
-        OutlineButton(label = "Pular identificação", onClick = onSkip, enabled = !isRegistering)
+        if (state.politicaCpf != PoliticaCpf.OBRIGATORIO) {
+            OutlineButton(label = "Pular identificação", onClick = onSkip, enabled = !isRegistering)
+        }
     }
 }
 

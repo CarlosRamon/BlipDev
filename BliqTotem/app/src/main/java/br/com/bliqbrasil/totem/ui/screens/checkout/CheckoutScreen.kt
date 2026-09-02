@@ -40,26 +40,29 @@ fun CheckoutScreen(
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
 
+    val palette = LocalBoxPalette.current
+
     Scaffold(
+        contentWindowInsets = WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom),
         topBar = {
             TopAppBar(
                 title = { Text("Checkout", fontFamily = FugazOne) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Voltar", tint = Surface)
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Voltar", tint = palette.onContrast)
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = Primary, titleContentColor = Surface),
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = palette.contrast, titleContentColor = palette.onContrast),
             )
         },
-        containerColor = Background,
+        containerColor = palette.background,
     ) { padding ->
         LazyColumn(
             modifier = Modifier.fillMaxSize().padding(padding).padding(horizontal = 24.dp),
-            contentPadding = PaddingValues(vertical = 16.dp),
+            contentPadding = PaddingValues(top = 16.dp, bottom = 16.dp + BliqDimens.BottomSafeGap),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-            item { Text("Resumo do Pedido", fontSize = 24.sp, fontFamily = FugazOne, color = OnSurface) }
+            item { Text("RESUMO DO PEDIDO", fontSize = 28.sp, fontFamily = FugazOne, color = palette.onBackground) }
 
             item {
                 Card(shape = RoundedCornerShape(14.dp), elevation = CardDefaults.cardElevation(2.dp), colors = CardDefaults.cardColors(containerColor = Surface)) {
@@ -90,17 +93,17 @@ fun CheckoutScreen(
             }
 
             item {
-                Card(shape = RoundedCornerShape(14.dp), colors = CardDefaults.cardColors(containerColor = Primary)) {
+                Card(shape = RoundedCornerShape(14.dp), colors = CardDefaults.cardColors(containerColor = androidx.compose.ui.graphics.Color.Transparent)) {
                     Row(modifier = Modifier.fillMaxWidth().padding(20.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                        Text("Total a pagar", fontFamily = Epilogue, color = Surface.copy(alpha = 0.85f), fontWeight = FontWeight.Medium, fontSize = 15.sp)
-                        Text(formatCurrency(viewModel.totalPrice), fontFamily = FugazOne, color = Surface, fontSize = 26.sp)
+                        Text("Total a pagar:", fontFamily = Epilogue, color = palette.onBackground, fontWeight = FontWeight.Medium, fontSize = 18.sp)
+                        Text(formatCurrency(viewModel.totalPrice), fontFamily = FugazOne, color = palette.onBackground, fontSize = 30.sp)
                     }
                 }
             }
 
             item {
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Text("FORMA DE PAGAMENTO", fontSize = 13.sp, fontFamily = Epilogue, fontWeight = FontWeight.SemiBold, color = Tertiary, letterSpacing = 0.5.sp)
+                    Text("FORMA DE PAGAMENTO", fontSize = 13.sp, fontFamily = Epilogue, fontWeight = FontWeight.SemiBold, color = palette.onBackground, letterSpacing = 0.5.sp)
                     Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                         PAYMENT_OPTIONS.forEach { option ->
                             PaymentCard(
@@ -132,12 +135,14 @@ private fun PaymentCard(
     onSelect: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val palette = LocalBoxPalette.current
     Card(
         onClick = onSelect,
         modifier = modifier,
         shape = RoundedCornerShape(12.dp),
-        border = if (isSelected) BorderStroke(2.dp, Primary) else null,
-        colors = CardDefaults.cardColors(containerColor = if (isSelected) PrimaryLight else Surface),
+        colors = CardDefaults.cardColors(
+            containerColor = if (isSelected) palette.contrast else palette.surface,
+        ),
         elevation = CardDefaults.cardElevation(2.dp),
     ) {
         Column(
@@ -148,14 +153,17 @@ private fun PaymentCard(
             BliqIconChip(
                 icon = option.icon,
                 size = 52.dp,
-                tint = if (isSelected) Surface else Primary,
-                background = if (isSelected) Primary else PrimaryLight,
+                tint = if (isSelected) palette.onContrast else palette.accent,
+                background = if (isSelected) palette.accent else palette.chipSoft,
                 contentDescription = option.label,
             )
-            Text(option.label, fontFamily = Epilogue, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = if (isSelected) Primary else Secondary)
-            if (isSelected) {
-                Surface(shape = CircleShape, color = Primary, modifier = Modifier.size(8.dp)) {}
-            }
+            Text(
+                option.label,
+                fontFamily = Epilogue,
+                fontSize = 15.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = if (isSelected) palette.onContrast else palette.onSurface,
+            )
         }
     }
 }

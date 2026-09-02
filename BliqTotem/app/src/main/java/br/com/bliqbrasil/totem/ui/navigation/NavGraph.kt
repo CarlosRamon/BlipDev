@@ -13,6 +13,7 @@ import br.com.bliqbrasil.totem.ui.screens.support.SupportScreen
 import br.com.bliqbrasil.totem.ui.screens.activation.ActivationViewModel
 import br.com.bliqbrasil.totem.ui.screens.checkout.CheckoutScreen
 import br.com.bliqbrasil.totem.ui.screens.checkout.CheckoutViewModel
+import br.com.bliqbrasil.totem.data.model.PoliticaCpf
 import br.com.bliqbrasil.totem.ui.screens.cpfinput.CpfInputScreen
 import br.com.bliqbrasil.totem.ui.screens.cpfinput.CpfInputViewModel
 import br.com.bliqbrasil.totem.ui.screens.extras.ExtrasScreen
@@ -56,7 +57,14 @@ fun NavGraph(navController: NavHostController, app: BliqTotemApp) {
             )
             WelcomeScreen(
                 viewModel = vm,
-                onStartFlow = { navController.navigate(AppDestinations.CpfInput) },
+                // Com a identificação desativada na franquia, o CPF sai do fluxo:
+                // vai direto para a escolha do serviço, sem cliente vinculado.
+                onStartFlow = {
+                    val destino =
+                        if (vm.state.value.politicaCpf == PoliticaCpf.DESATIVADO) AppDestinations.Home()
+                        else AppDestinations.CpfInput
+                    navController.navigate(destino)
+                },
                 onNeedActivation = {
                     navController.navigate(AppDestinations.Activation) {
                         popUpTo(0) { inclusive = true }
@@ -77,7 +85,7 @@ fun NavGraph(navController: NavHostController, app: BliqTotemApp) {
 
         composable<AppDestinations.CpfInput> {
             val vm = viewModel<CpfInputViewModel>(
-                factory = CpfInputViewModel.factory(app.repository)
+                factory = CpfInputViewModel.factory(app.repository, app.tokenStorage)
             )
             CpfInputScreen(
                 viewModel = vm,

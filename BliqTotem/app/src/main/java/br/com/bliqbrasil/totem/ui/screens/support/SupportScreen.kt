@@ -16,8 +16,11 @@ import br.com.bliqbrasil.totem.ui.theme.*
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SupportScreen(onBack: () -> Unit) {
+    val palette = LocalBoxPalette.current
+
     Scaffold(
-        containerColor = Background,
+        contentWindowInsets = WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom),
+        containerColor = palette.background,
         topBar = {
             TopAppBar(
                 title = {
@@ -25,7 +28,7 @@ fun SupportScreen(onBack: () -> Unit) {
                         "Fale Conosco",
                         fontFamily = FugazOne,
                         fontSize = 20.sp,
-                        color = OnSurface,
+                        color = palette.onBackground,
                     )
                 },
                 navigationIcon = {
@@ -33,11 +36,11 @@ fun SupportScreen(onBack: () -> Unit) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                             contentDescription = "Voltar",
-                            tint = OnSurface,
+                            tint = palette.onBackground,
                         )
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = Surface),
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = palette.contrast, titleContentColor = palette.onContrast),
             )
         }
     ) { padding ->
@@ -55,7 +58,7 @@ fun SupportScreen(onBack: () -> Unit) {
                 text = "Precisa de ajuda? Entre em contato com nossa equipe de suporte.",
                 fontFamily = Epilogue,
                 fontSize = 15.sp,
-                color = Secondary,
+                color = palette.onBackground.copy(alpha = 0.85f),
             )
 
             ContactRow(label = "E-mail", value = "angelo@bliqbrasil.com.br")
@@ -67,13 +70,13 @@ fun SupportScreen(onBack: () -> Unit) {
                 text = "Horário de atendimento",
                 fontFamily = FugazOne,
                 fontSize = 16.sp,
-                color = OnSurface,
+                color = palette.onBackground,
             )
             Text(
                 text = "Segunda a sexta, das 9h às 18h.",
                 fontFamily = Epilogue,
                 fontSize = 14.sp,
-                color = Secondary,
+                color = palette.onBackground.copy(alpha = 0.85f),
             )
 
             Spacer(Modifier.height(16.dp))
@@ -83,19 +86,20 @@ fun SupportScreen(onBack: () -> Unit) {
 
 @Composable
 private fun ContactRow(label: String, value: String) {
+    val palette = LocalBoxPalette.current
     Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
         Text(
             text = label,
             fontFamily = Epilogue,
-            fontSize = 12.sp,
-            color = Tertiary,
+            fontSize = 13.sp,
+            color = palette.onBackground.copy(alpha = 0.7f),
             fontWeight = FontWeight.Medium,
         )
         Text(
             text = value,
             fontFamily = Epilogue,
             fontSize = 15.sp,
-            color = OnSurface,
+            color = palette.onBackground,
         )
     }
 }

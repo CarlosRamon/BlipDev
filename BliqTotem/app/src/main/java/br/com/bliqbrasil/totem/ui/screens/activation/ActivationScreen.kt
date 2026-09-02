@@ -40,7 +40,9 @@ fun ActivationScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .imePadding(),
+            .imePadding()
+            .navigationBarsPadding()
+            .padding(bottom = BliqDimens.BottomSafeGap),
         contentAlignment = Alignment.Center,
     ) {
         Column(

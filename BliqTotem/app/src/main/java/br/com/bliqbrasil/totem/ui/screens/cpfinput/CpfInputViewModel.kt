@@ -3,7 +3,9 @@ package br.com.bliqbrasil.totem.ui.screens.cpfinput
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import br.com.bliqbrasil.totem.data.local.TokenStorage
 import br.com.bliqbrasil.totem.data.model.Cliente
+import br.com.bliqbrasil.totem.data.model.PoliticaCpf
 import br.com.bliqbrasil.totem.data.model.TermosAtual
 import br.com.bliqbrasil.totem.data.repository.PosRepository
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -13,10 +15,14 @@ import kotlinx.coroutines.launch
 
 enum class CpfStep { ENTERING_CPF, LOADING, FOUND, NOT_FOUND, REGISTERING }
 
-class CpfInputViewModel(private val repository: PosRepository) : ViewModel() {
+class CpfInputViewModel(
+    private val repository: PosRepository,
+    tokenStorage: TokenStorage,
+) : ViewModel() {
 
     data class UiState(
         val step: CpfStep = CpfStep.ENTERING_CPF,
+        val politicaCpf: PoliticaCpf = PoliticaCpf.OPCIONAL,
         val cpf: String = "",
         val nome: String = "",
         val telefone: String = "",
@@ -31,7 +37,9 @@ class CpfInputViewModel(private val repository: PosRepository) : ViewModel() {
         val aceitaMarketing: Boolean = false,
     )
 
-    private val _state = MutableStateFlow(UiState())
+    private val _state = MutableStateFlow(
+        UiState(politicaCpf = PoliticaCpf.from(tokenStorage.getPoliticaCpf()))
+    )
     val state = _state.asStateFlow()
 
     init {
@@ -154,11 +162,12 @@ class CpfInputViewModel(private val repository: PosRepository) : ViewModel() {
         private fun toTitleCase(s: String): String =
             s.lowercase().split(" ").joinToString(" ") { it.replaceFirstChar(Char::uppercaseChar) }
 
-        fun factory(repository: PosRepository) = object : ViewModelProvider.Factory {
-            override fun <T : ViewModel> create(modelClass: Class<T>): T {
-                @Suppress("UNCHECKED_CAST")
-                return CpfInputViewModel(repository) as T
+        fun factory(repository: PosRepository, tokenStorage: TokenStorage) =
+            object : ViewModelProvider.Factory {
+                override fun <T : ViewModel> create(modelClass: Class<T>): T {
+                    @Suppress("UNCHECKED_CAST")
+                    return CpfInputViewModel(repository, tokenStorage) as T
+                }
             }
-        }
     }
 }

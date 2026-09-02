@@ -28,10 +28,13 @@ fun MinutesPickerScreen(
     onBack: () -> Unit,
     onContinue: (minutes: Int, totalPrice: Double) -> Unit,
 ) {
+    val palette = LocalBoxPalette.current
+
     var minutes by remember { mutableIntStateOf(1) }
     val totalPrice = minutes * washOption.price
 
     Scaffold(
+        contentWindowInsets = WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom),
         topBar = {
             TopAppBar(
                 title = { Text("Escolha o tempo", fontFamily = FugazOne) },
@@ -40,12 +43,18 @@ fun MinutesPickerScreen(
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Voltar", tint = Surface)
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = Primary, titleContentColor = Surface),
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = palette.contrast, titleContentColor = palette.onContrast),
             )
         },
-        containerColor = Background,
+        containerColor = palette.background,
         bottomBar = {
-            Box(modifier = Modifier.padding(16.dp)) {
+            // O Scaffold NÃO repassa contentWindowInsets ao bottomBar — ele
+            // precisa consumir o inset da barra de navegação por conta própria.
+            Box(
+                modifier = Modifier
+                    .navigationBarsPadding()
+                    .padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = BliqDimens.BottomSafeGap)
+            ) {
                 PrimaryButton(
                     label = "Continuar · ${formatCurrency(totalPrice)}",
                     onClick = { onContinue(minutes, totalPrice) },
@@ -68,12 +77,12 @@ fun MinutesPickerScreen(
                 verticalArrangement = Arrangement.Center,
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
-                Text(washOption.label, fontSize = 20.sp, fontFamily = FugazOne, color = OnSurface)
+                Text(washOption.label.uppercase(), fontSize = 22.sp, fontFamily = FugazOne, color = palette.onBackground)
                 Text(
                     "${formatCurrency(washOption.price)} por minuto",
-                    fontSize = 14.sp,
+                    fontSize = 16.sp,
                     fontFamily = Epilogue,
-                    color = Secondary,
+                    color = palette.onBackground.copy(alpha = 0.9f),
                     modifier = Modifier.padding(top = 4.dp, bottom = 24.dp),
                 )
 
@@ -85,33 +94,39 @@ fun MinutesPickerScreen(
                         onClick = { if (minutes - STEP >= MIN_MINUTES) minutes -= STEP },
                         modifier = Modifier.size(72.dp),
                         shape = RoundedCornerShape(16.dp),
-                        colors = ButtonDefaults.filledTonalButtonColors(containerColor = Surface),
+                        colors = ButtonDefaults.filledTonalButtonColors(
+                            containerColor = palette.surface,
+                            disabledContainerColor = palette.surface.copy(alpha = 0.4f),
+                        ),
                         contentPadding = PaddingValues(0.dp),
                         enabled = minutes - STEP >= MIN_MINUTES,
                     ) {
-                        Text("−", fontSize = 32.sp, fontFamily = FugazOne, color = Primary)
+                        Text("−", fontSize = 32.sp, fontFamily = FugazOne, color = palette.accent)
                     }
 
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Text(
                             "$minutes",
-                            fontSize = 64.sp,
+                            fontSize = 72.sp,
                             fontFamily = FugazOne,
-                            color = Primary,
-                            lineHeight = 72.sp,
+                            color = palette.onBackground,
+                            lineHeight = 80.sp,
                         )
-                        Text("minutos", fontSize = 16.sp, fontFamily = Epilogue, color = Secondary)
+                        Text("minutos", fontSize = 17.sp, fontFamily = Epilogue, color = palette.onBackground.copy(alpha = 0.9f))
                     }
 
                     FilledTonalButton(
                         onClick = { if (minutes + STEP <= MAX_MINUTES) minutes += STEP },
                         modifier = Modifier.size(72.dp),
                         shape = RoundedCornerShape(16.dp),
-                        colors = ButtonDefaults.filledTonalButtonColors(containerColor = Surface),
+                        colors = ButtonDefaults.filledTonalButtonColors(
+                            containerColor = palette.surface,
+                            disabledContainerColor = palette.surface.copy(alpha = 0.4f),
+                        ),
                         contentPadding = PaddingValues(0.dp),
                         enabled = minutes + STEP <= MAX_MINUTES,
                     ) {
-                        Text("+", fontSize = 32.sp, fontFamily = FugazOne, color = Primary)
+                        Text("+", fontSize = 32.sp, fontFamily = FugazOne, color = palette.accent)
                     }
                 }
 
@@ -119,7 +134,7 @@ fun MinutesPickerScreen(
 
                 Card(
                     shape = RoundedCornerShape(14.dp),
-                    colors = CardDefaults.cardColors(containerColor = Primary),
+                    colors = CardDefaults.cardColors(containerColor = palette.contrast),
                 ) {
                     Row(
                         modifier = Modifier
@@ -128,8 +143,8 @@ fun MinutesPickerScreen(
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Text("Total", fontFamily = Epilogue, color = Surface.copy(alpha = 0.8f), fontSize = 14.sp)
-                        Text(formatCurrency(totalPrice), fontFamily = FugazOne, color = Surface, fontSize = 28.sp)
+                        Text("Total", fontFamily = Epilogue, color = palette.onContrast.copy(alpha = 0.85f), fontSize = 16.sp)
+                        Text(formatCurrency(totalPrice), fontFamily = FugazOne, color = palette.onContrast, fontSize = 28.sp)
                     }
                 }
 

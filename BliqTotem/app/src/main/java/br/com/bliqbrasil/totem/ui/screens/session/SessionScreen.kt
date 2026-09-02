@@ -20,6 +20,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import br.com.bliqbrasil.totem.data.model.ConnectionStatus
 import br.com.bliqbrasil.totem.data.model.Machine
 import br.com.bliqbrasil.totem.ui.components.BleStatusBar
+import br.com.bliqbrasil.totem.ui.components.machineIcon
 import br.com.bliqbrasil.totem.ui.theme.*
 import br.com.bliqbrasil.totem.util.formatTime
 
@@ -34,6 +35,7 @@ fun SessionScreen(
     val bleError  by viewModel.bleManager.errorMessage.collectAsStateWithLifecycle()
     var showEndDialog by remember { mutableStateOf(false) }
     val snackbarHostState = remember { SnackbarHostState() }
+    val palette = LocalBoxPalette.current
 
     BackHandler(enabled = !state.isEnding) { showEndDialog = true }
 
@@ -77,10 +79,11 @@ fun SessionScreen(
     }
 
     Scaffold(
+        contentWindowInsets = WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom),
         topBar = {
             TopAppBar(
                 title = { Text(viewModel.sessionTitle, fontFamily = FugazOne) },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = Primary, titleContentColor = Surface),
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = palette.contrast, titleContentColor = palette.onContrast),
                 navigationIcon = {},
             )
         },
@@ -94,14 +97,14 @@ fun SessionScreen(
                 )
             }
         },
-        containerColor = Background,
+        containerColor = palette.background,
     ) { padding ->
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
                 .padding(horizontal = 20.dp),
-            contentPadding = PaddingValues(vertical = 20.dp),
+            contentPadding = PaddingValues(top = 20.dp, bottom = 20.dp + BliqDimens.BottomSafeGap),
             verticalArrangement = Arrangement.spacedBy(20.dp),
         ) {
             item {
@@ -110,7 +113,7 @@ fun SessionScreen(
                     state.isPaused         -> Warning
                     state.remaining <= 60  -> Error
                     state.remaining <= 180 -> Warning
-                    else                   -> Primary
+                    else                   -> palette.contrast
                 }
                 val timerLabel = when {
                     state.isEnding        -> "Encerrando..."
@@ -135,22 +138,21 @@ fun SessionScreen(
 
                         val activeMachine = state.activeMachine
                         if (activeMachine != null) {
-                            val machineColor = Color(activeMachine.colorHex)
                             Surface(
                                 shape = RoundedCornerShape(20.dp),
-                                color = machineColor.copy(alpha = 0.12f),
+                                color = palette.chipSoft,
                             ) {
                                 Row(
                                     modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp),
                                     verticalAlignment = Alignment.CenterVertically,
                                     horizontalArrangement = Arrangement.spacedBy(6.dp),
                                 ) {
-                                    Text(activeMachine.icon, fontSize = 16.sp)
-                                    Text(activeMachine.label, fontFamily = Epilogue, color = machineColor, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+                                    Icon(machineIcon(activeMachine), contentDescription = null, tint = palette.onChipSoft, modifier = Modifier.size(18.dp))
+                                    Text(activeMachine.label, fontFamily = Epilogue, color = palette.onChipSoft, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
                                 }
                             }
                         } else {
-                            Surface(shape = RoundedCornerShape(20.dp), color = Background) {
+                            Surface(shape = RoundedCornerShape(20.dp), color = palette.chipSoft) {
                                 Text(
                                     if (viewModel.boxTipo == "ASPIRACAO") "Selecione um serviço" else "Selecione um equipamento",
                                     fontFamily = Epilogue,
@@ -177,7 +179,7 @@ fun SessionScreen(
 
             item {
                 val label = if (viewModel.boxTipo == "ASPIRACAO") "SELECIONAR SERVIÇO" else "SELECIONAR EQUIPAMENTO"
-                Text(label, fontFamily = Epilogue, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = Tertiary, letterSpacing = 0.5.sp)
+                Text(label, fontFamily = Epilogue, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = palette.onBackground.copy(alpha = 0.85f), letterSpacing = 0.5.sp)
             }
 
             items(viewModel.machines, key = { it.name }) { machine ->
@@ -185,6 +187,7 @@ fun SessionScreen(
                     machine = machine,
                     isActive = state.activeMachine == machine,
                     isDisabled = state.isEnding,
+                    palette = palette,
                     onClick = { viewModel.selectMachine(machine) },
                 )
             }
@@ -209,9 +212,9 @@ fun SessionScreen(
                     enabled = !state.isEnding,
                     modifier = Modifier.fillMaxWidth().height(52.dp),
                     border = ButtonDefaults.outlinedButtonBorder.copy(
-                        brush = androidx.compose.ui.graphics.SolidColor(if (state.isEnding) Tertiary else Error)
+                        brush = androidx.compose.ui.graphics.SolidColor(if (state.isEnding) Tertiary else palette.danger)
                     ),
-                    colors = ButtonDefaults.outlinedButtonColors(contentColor = Error),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = palette.danger),
                 ) {
                     Text(
                         if (state.isEnding) "Encerrando..." else "Encerrar sessão",
@@ -230,41 +233,52 @@ private fun MachineCard(
     machine: Machine,
     isActive: Boolean,
     isDisabled: Boolean,
+    palette: BoxPalette,
     onClick: () -> Unit,
 ) {
-    val machineColor = Color(machine.colorHex)
+    // Selecionado: card na cor de contraste (navy na Lavação, azul na Aspiração),
+    // com a pastilha do ícone na cor do fundo da tela — a inversão do Figma.
+    val cardColor  = if (isActive) palette.contrast else palette.surface
+    val labelColor = if (isActive) palette.onContrast else palette.onSurface
+    val chipColor  = if (isActive) palette.background else palette.iconChip
+    val chipIcon   = if (isActive) palette.onBackground else palette.onIconChip
+
     Card(
         onClick = onClick,
         enabled = !isDisabled,
         shape = RoundedCornerShape(14.dp),
-        border = if (isActive) androidx.compose.foundation.BorderStroke(2.dp, machineColor) else null,
-        colors = CardDefaults.cardColors(containerColor = if (isActive) machineColor.copy(alpha = 0.07f) else Surface),
+        colors = CardDefaults.cardColors(containerColor = cardColor),
         elevation = CardDefaults.cardElevation(2.dp),
         modifier = Modifier.fillMaxWidth(),
     ) {
-        Box {
-            Row(
-                modifier = Modifier.padding(18.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
+        Row(
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(14.dp),
+        ) {
+            Box(
+                modifier = Modifier.size(46.dp).background(chipColor, SquircleShape),
+                contentAlignment = Alignment.Center,
             ) {
-                Text(machine.icon, fontSize = 28.sp)
-                Text(
-                    machine.label,
-                    fontFamily = Epilogue,
-                    fontSize = 15.sp,
-                    fontWeight = if (isActive) FontWeight.Bold else FontWeight.Medium,
-                    color = if (isActive) machineColor else Secondary,
+                Icon(
+                    machineIcon(machine),
+                    contentDescription = null,
+                    tint = chipIcon,
+                    modifier = Modifier.size(24.dp),
                 )
             }
+            Text(
+                machine.label,
+                fontFamily = Epilogue,
+                fontSize = 17.sp,
+                fontWeight = if (isActive) FontWeight.Bold else FontWeight.SemiBold,
+                color = labelColor,
+                modifier = Modifier.weight(1f),
+            )
             if (isActive) {
-                Box(
-                    modifier = Modifier
-                        .padding(10.dp)
-                        .size(8.dp)
-                        .background(machineColor, CircleShape)
-                        .align(Alignment.TopEnd)
-                )
+                Box(modifier = Modifier.size(8.dp).background(palette.onContrast, CircleShape))
+            } else {
+                Text("\u203A", fontFamily = Epilogue, fontSize = 20.sp, color = Tertiary)
             }
         }
     }

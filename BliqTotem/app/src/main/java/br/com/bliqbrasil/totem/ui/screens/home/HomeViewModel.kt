@@ -88,6 +88,7 @@ class HomeViewModel(
                         )
                     }
                     val boxTipo = config.box.tipo
+                    tokenStorage.saveBoxTipo(boxTipo)
                     _state.update { it.copy(config = config, washOptions = options, boxTipo = boxTipo) }
 
                     // Check for active cycle

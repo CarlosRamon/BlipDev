@@ -43,7 +43,9 @@ class SuccessViewModel(
                 }
 
                 _state.update { it.copy(bleStep = BleStep.REGISTERING) }
-                repository.iniciarCiclo(cicloId)
+                // getOrThrow: sem isso a falha do backend (ex.: 409 Box offline) era
+                // descartada e a tela seguia como se o ciclo tivesse iniciado.
+                repository.iniciarCiclo(cicloId).getOrThrow()
 
                 _state.update { it.copy(bleStep = BleStep.SUCCESS) }
                 launch { repository.registrarTelemetriaInternal("CICLO_INICIADO", mapOf("cicloId" to cicloId, "totalMinutes" to totalMinutes)) }

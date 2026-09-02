@@ -34,6 +34,7 @@ fun WelcomeScreen(
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val bleStatus by viewModel.bleManager.status.collectAsStateWithLifecycle()
+    val palette = LocalBoxPalette.current
 
     var logoTapCount by remember { mutableIntStateOf(0) }
     var showResetDialog by remember { mutableStateOf(false) }
@@ -94,13 +95,15 @@ fun WelcomeScreen(
     )
 
     Box(
-        modifier = Modifier.fillMaxSize().background(BrandGradientDeep),
+        modifier = Modifier.fillMaxSize().background(palette.background),
         contentAlignment = Alignment.Center,
     ) {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(28.dp),
-            modifier = Modifier.padding(horizontal = 48.dp),
+            modifier = Modifier
+                .navigationBarsPadding()
+                .padding(horizontal = 48.dp),
         ) {
             Image(
                 painter = painterResource(R.drawable.bliq_tagline),
@@ -116,15 +119,16 @@ fun WelcomeScreen(
                             }
                         }
                     },
-                colorFilter = ColorFilter.tint(Surface),
+                colorFilter = ColorFilter.tint(palette.logoTint),
             )
 
             state.config?.let { cfg ->
                 Text(
-                    text       = cfg.box.nome,
-                    fontSize   = 18.sp,
+                    text       = cfg.box.nome.uppercase(),
+                    fontSize   = 34.sp,
+                    lineHeight = 40.sp,
                     fontFamily = FugazOne,
-                    color      = Surface.copy(alpha = 0.85f),
+                    color      = palette.onBackground,
                     textAlign  = TextAlign.Center,
                 )
             }
@@ -138,8 +142,8 @@ fun WelcomeScreen(
                             .height(64.dp)
                             .scale(scale),
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = Surface,
-                            contentColor   = Primary,
+                            containerColor = palette.ctaContainer,
+                            contentColor   = palette.onCtaContainer,
                         ),
                         shape = RoundedCornerShape(16.dp),
                     ) {
@@ -158,7 +162,7 @@ fun WelcomeScreen(
                         verticalArrangement = Arrangement.spacedBy(16.dp),
                     ) {
                         CircularProgressIndicator(
-                            color       = Surface,
+                            color       = palette.onBackground,
                             strokeWidth = 3.dp,
                             modifier    = Modifier.size(40.dp),
                         )
@@ -167,7 +171,7 @@ fun WelcomeScreen(
                             fontFamily  = Epilogue,
                             fontSize    = 17.sp,
                             fontWeight  = FontWeight.SemiBold,
-                            color       = Surface,
+                            color       = palette.onBackground,
                             textAlign   = TextAlign.Center,
                         )
                     }
@@ -192,7 +196,7 @@ fun WelcomeScreen(
                             fontFamily  = Epilogue,
                             fontSize    = 17.sp,
                             fontWeight  = FontWeight.SemiBold,
-                            color       = Surface,
+                            color       = palette.onBackground,
                             textAlign   = TextAlign.Center,
                         )
                     }
@@ -210,12 +214,13 @@ fun WelcomeScreen(
         Row(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
+                .navigationBarsPadding()
                 .padding(bottom = 28.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(6.dp),
         ) {
-            Text(dot,   fontSize = 10.sp, color = Surface.copy(alpha = 0.6f))
-            Text(label, fontFamily = Epilogue, fontSize = 13.sp, color = Surface.copy(alpha = 0.6f))
+            Text(dot,   fontSize = 10.sp, color = palette.onBackground.copy(alpha = 0.6f))
+            Text(label, fontFamily = Epilogue, fontSize = 13.sp, color = palette.onBackground.copy(alpha = 0.6f))
         }
     }
 }

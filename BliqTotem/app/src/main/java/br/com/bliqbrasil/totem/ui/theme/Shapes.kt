@@ -41,3 +41,15 @@ object SquircleShape : Shape {
         )
     }
 }
+
+/**
+ * Dimensões de segurança do totem.
+ *
+ * [BottomSafeGap] é somado aos window insets nos CTAs de rodapé. Os insets
+ * sozinhos não bastam: quando as system bars estão escondidas eles valem zero, e
+ * a barra transiente (mostrada por swipe) é um overlay que não altera inset
+ * nenhum. Essa folga fixa garante que o botão nunca fique sob a barra.
+ */
+object BliqDimens {
+    val BottomSafeGap = 28.dp
+}

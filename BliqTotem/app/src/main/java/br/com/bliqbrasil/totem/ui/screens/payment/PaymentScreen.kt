@@ -36,6 +36,7 @@ fun PaymentScreen(
     onSuccess: (cicloId: String, acquirerKey: String) -> Unit,
     onBack: () -> Unit,
 ) {
+    val palette = LocalBoxPalette.current
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val activity = LocalContext.current as Activity
 
@@ -54,7 +55,7 @@ fun PaymentScreen(
     }
 
     Box(
-        modifier = Modifier.fillMaxSize().background(Background),
+        modifier = Modifier.fillMaxSize().background(palette.background).navigationBarsPadding(),
         contentAlignment = Alignment.Center,
     ) {
         when (val state = uiState.paymentState) {
@@ -111,7 +112,7 @@ fun PaymentScreen(
             Surface(
                 modifier = Modifier.align(Alignment.TopCenter).padding(top = 32.dp),
                 shape = RoundedCornerShape(20.dp),
-                color = Primary.copy(alpha = 0.1f),
+                color = palette.onBackground.copy(alpha = 0.15f),
             ) {
                 val (icon, label) = when (viewModel.paymentMethod) {
                     PaymentMethod.CREDIT -> BliqIcons.Credit to "Crédito"
@@ -123,7 +124,7 @@ fun PaymentScreen(
                     horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(8.dp),
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
                 ) {
-                    Icon(imageVector = icon, contentDescription = null, tint = Primary, modifier = Modifier.size(18.dp))
+                    Icon(imageVector = icon, contentDescription = null, tint = palette.onBackground, modifier = Modifier.size(18.dp))
                     Text(
                         text = label,
                         fontFamily = Epilogue,
@@ -139,9 +140,10 @@ fun PaymentScreen(
 
 @Composable
 private fun WaitingCardContent(onCancel: () -> Unit) {
+    val palette = LocalBoxPalette.current
     val infiniteTransition = rememberInfiniteTransition(label = "pulse")
     val alpha by infiniteTransition.animateFloat(
-        initialValue = 0.3f,
+        initialValue = 0.45f,
         targetValue  = 1f,
         animationSpec = infiniteRepeatable(
             animation  = tween(900, easing = LinearEasing),
@@ -153,36 +155,47 @@ private fun WaitingCardContent(onCancel: () -> Unit) {
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(24.dp),
-        modifier = Modifier.padding(32.dp),
+        modifier = Modifier.padding(start = 32.dp, end = 32.dp, top = 32.dp, bottom = 32.dp + BliqDimens.BottomSafeGap),
     ) {
+        // Halo claro + disco branco: sobre o fundo colorido, um halo na própria
+        // cor primária ficaria invisível.
         Box(
             contentAlignment = Alignment.Center,
             modifier = Modifier
-                .size(140.dp)
+                .size(170.dp)
                 .clip(CircleShape)
-                .background(Primary.copy(alpha = alpha * 0.18f)),
+                .background(Color(0xFFD9DEE7).copy(alpha = alpha)),
         ) {
-            Icon(
-                imageVector = BliqIcons.Contactless,
-                contentDescription = null,
-                tint = Primary,
-                modifier = Modifier.size(72.dp),
-            )
+            Box(
+                contentAlignment = Alignment.Center,
+                modifier = Modifier
+                    .size(118.dp)
+                    .clip(CircleShape)
+                    .background(palette.surface),
+            ) {
+                Icon(
+                    imageVector = BliqIcons.Contactless,
+                    contentDescription = null,
+                    tint = palette.accent,
+                    modifier = Modifier.size(58.dp),
+                )
+            }
         }
 
         Text(
-            text       = "Aproxime ou insira o cartão",
+            text       = "APROXIME OU\nINSIRA O CARTÃO",
             fontFamily = FugazOne,
-            fontSize   = 22.sp,
-            color      = OnSurface,
+            fontSize   = 26.sp,
+            lineHeight = 32.sp,
+            color      = palette.onBackground,
             textAlign  = TextAlign.Center,
         )
 
         Text(
             text       = "Aguardando pagamento...",
             fontFamily = Epilogue,
-            fontSize   = 15.sp,
-            color      = Secondary,
+            fontSize   = 17.sp,
+            color      = palette.onBackground,
             textAlign  = TextAlign.Center,
         )
 
@@ -193,6 +206,7 @@ private fun WaitingCardContent(onCancel: () -> Unit) {
 
 @Composable
 private fun WaitingQrCodeContent(state: PaymentState.WaitingQrCode, onCancel: () -> Unit) {
+    val palette = LocalBoxPalette.current
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(20.dp),
@@ -204,7 +218,7 @@ private fun WaitingQrCodeContent(state: PaymentState.WaitingQrCode, onCancel: ()
             text       = "Escaneie o QR Code PIX",
             fontFamily = FugazOne,
             fontSize   = 22.sp,
-            color      = OnSurface,
+            color      = palette.onBackground,
             textAlign  = TextAlign.Center,
         )
 
@@ -235,7 +249,7 @@ private fun WaitingQrCodeContent(state: PaymentState.WaitingQrCode, onCancel: ()
             text       = "Abra o app do seu banco e pague via PIX",
             fontFamily = Epilogue,
             fontSize   = 14.sp,
-            color      = Secondary,
+            color      = palette.onBackground,
             textAlign  = TextAlign.Center,
         )
 
@@ -252,10 +266,11 @@ private fun StatusContent(
     subtitle: String,
     showSpinner: Boolean = false,
 ) {
+    val palette = LocalBoxPalette.current
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(20.dp),
-        modifier = Modifier.padding(32.dp),
+        modifier = Modifier.padding(start = 32.dp, end = 32.dp, top = 32.dp, bottom = 32.dp + BliqDimens.BottomSafeGap),
     ) {
         Box(
             contentAlignment = Alignment.Center,
@@ -266,20 +281,21 @@ private fun StatusContent(
         ) {
             Icon(imageVector = icon, contentDescription = null, tint = iconTint, modifier = Modifier.size(64.dp))
         }
-        Text(title, fontFamily = FugazOne, fontSize = 28.sp, color = OnSurface, textAlign = TextAlign.Center)
-        Text(subtitle, fontFamily = Epilogue, fontSize = 16.sp, color = Secondary, textAlign = TextAlign.Center)
+        Text(title.uppercase(), fontFamily = FugazOne, fontSize = 28.sp, lineHeight = 34.sp, color = palette.onBackground, textAlign = TextAlign.Center)
+        Text(subtitle, fontFamily = Epilogue, fontSize = 16.sp, color = palette.onBackground.copy(alpha = 0.9f), textAlign = TextAlign.Center)
         if (showSpinner) {
-            CircularProgressIndicator(color = Primary, modifier = Modifier.size(32.dp), strokeWidth = 3.dp)
+            CircularProgressIndicator(color = palette.onBackground, modifier = Modifier.size(32.dp), strokeWidth = 3.dp)
         }
     }
 }
 
 @Composable
 private fun FailureContent(message: String, onRetry: () -> Unit, onBack: () -> Unit) {
+    val palette = LocalBoxPalette.current
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(20.dp),
-        modifier = Modifier.padding(32.dp),
+        modifier = Modifier.padding(start = 32.dp, end = 32.dp, top = 32.dp, bottom = 32.dp + BliqDimens.BottomSafeGap),
     ) {
         Box(
             contentAlignment = Alignment.Center,
@@ -290,8 +306,8 @@ private fun FailureContent(message: String, onRetry: () -> Unit, onBack: () -> U
         ) {
             Icon(imageVector = BliqIcons.Close, contentDescription = null, tint = Error, modifier = Modifier.size(64.dp))
         }
-        Text("Não autorizada", fontFamily = FugazOne, fontSize = 28.sp, color = OnSurface, textAlign = TextAlign.Center)
-        Text(message, fontFamily = Epilogue, fontSize = 16.sp, color = Secondary, textAlign = TextAlign.Center)
+        Text("NÃO AUTORIZADA", fontFamily = FugazOne, fontSize = 28.sp, color = palette.onBackground, textAlign = TextAlign.Center)
+        Text(message, fontFamily = Epilogue, fontSize = 16.sp, color = palette.onBackground.copy(alpha = 0.9f), textAlign = TextAlign.Center)
         Spacer(Modifier.height(8.dp))
         PrimaryButton(label = "Tentar novamente", onClick = onRetry)
         OutlineButton(label = "Voltar ao checkout", onClick = onBack)

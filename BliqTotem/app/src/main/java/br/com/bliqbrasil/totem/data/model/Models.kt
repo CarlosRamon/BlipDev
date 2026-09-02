@@ -20,7 +20,28 @@ data class PosConfig(
 )
 
 data class Terminal(val id: String, val serial: String, val modelo: String?)
-data class Franqueado(val id: String, val nome: String, val status: String)
+/**
+ * Política de identificação do cliente, definida por franquia no painel.
+ * O default OPCIONAL mantém o comportamento antigo caso o backend não envie
+ * o campo (totem novo contra backend velho).
+ */
+enum class PoliticaCpf {
+    DESATIVADO,   // pula a tela de identificação
+    OPCIONAL,     // tela aparece, cliente pode pular
+    OBRIGATORIO;  // tela aparece, sem opção de pular
+
+    companion object {
+        fun from(raw: String?): PoliticaCpf =
+            entries.firstOrNull { it.name.equals(raw, ignoreCase = true) } ?: OPCIONAL
+    }
+}
+
+data class Franqueado(
+    val id: String,
+    val nome: String,
+    val status: String,
+    val politicaCpf: String = "OPCIONAL",
+)
 data class Box(val id: String, val nome: String, val tipo: String = "LAVACAO", val status: String)
 data class Esp32Info(
     val uuid: String? = null,           // campo legado (backend antigo)

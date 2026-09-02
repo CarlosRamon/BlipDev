@@ -35,15 +35,18 @@ fun SuccessScreen(
         if (state.sessionReady) onSessionReady(viewModel.cicloId)
     }
 
+    val palette = LocalBoxPalette.current
+
     Scaffold(
+        contentWindowInsets = WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom),
         topBar = {
             TopAppBar(
                 title = { Text("Pagamento Confirmado", fontFamily = FugazOne) },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = Primary, titleContentColor = Surface),
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = palette.contrast, titleContentColor = palette.onContrast),
                 navigationIcon = {},
             )
         },
-        containerColor = Background,
+        containerColor = palette.backgroundAlt,
     ) { padding ->
         BoxWithConstraints(
             modifier = Modifier
@@ -76,7 +79,7 @@ fun SuccessScreen(
                     text = "Pagamento realizado\ncom sucesso!",
                     fontFamily = FugazOne,
                     fontSize = 22.sp,
-                    color = OnSurface,
+                    color = palette.accent,
                     textAlign = TextAlign.Center,
                     lineHeight = 30.sp,
                 )
@@ -86,12 +89,12 @@ fun SuccessScreen(
                 Card(
                     shape = RoundedCornerShape(14.dp),
                     elevation = CardDefaults.cardElevation(2.dp),
-                    colors = CardDefaults.cardColors(containerColor = Surface),
+                    colors = CardDefaults.cardColors(containerColor = palette.accent),
                     modifier = Modifier.fillMaxWidth(),
                 ) {
                     Column(modifier = Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                            Text("Forma de pagamento", fontFamily = Epilogue, color = Secondary, fontSize = 14.sp)
+                            Text("Forma de pagamento", fontFamily = Epilogue, color = Surface.copy(alpha = 0.9f), fontSize = 16.sp)
                             Text(
                                 text = when (paymentMethod) {
                                     PaymentMethod.CREDIT -> "Cartão de Crédito"
@@ -105,13 +108,13 @@ fun SuccessScreen(
                         }
                         HorizontalDivider(color = Divider)
                         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                            Text("Tempo liberado", fontFamily = Epilogue, color = Secondary, fontSize = 14.sp)
+                            Text("Tempo liberado", fontFamily = Epilogue, color = Surface.copy(alpha = 0.9f), fontSize = 16.sp)
                             Text("$totalMinutes minutos", fontFamily = Epilogue, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
                         }
                         HorizontalDivider(color = Divider)
                         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                            Text("Valor cobrado", fontFamily = Epilogue, color = Secondary, fontSize = 14.sp)
-                            Text(formatCurrency(totalPrice), fontFamily = FugazOne, color = Primary, fontSize = 16.sp)
+                            Text("Valor cobrado", fontFamily = Epilogue, color = Surface.copy(alpha = 0.9f), fontSize = 16.sp)
+                            Text(formatCurrency(totalPrice), fontFamily = FugazOne, color = Surface, fontSize = 22.sp)
                         }
                     }
                 }

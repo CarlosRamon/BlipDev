@@ -5,6 +5,8 @@ import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
@@ -12,6 +14,7 @@ import androidx.navigation.compose.rememberNavController
 import br.com.bliqbrasil.totem.ui.navigation.AppDestinations
 import br.com.bliqbrasil.totem.ui.navigation.NavGraph
 import br.com.bliqbrasil.totem.ui.theme.BliqTotemTheme
+import br.com.bliqbrasil.totem.ui.theme.BoxTipo
 
 class MainActivity : ComponentActivity() {
 
@@ -23,7 +26,9 @@ class MainActivity : ComponentActivity() {
         val app = application as BliqTotemApp
 
         setContent {
-            BliqTotemTheme {
+            val boxTipoRaw by app.tokenStorage.boxTipo.collectAsStateWithLifecycle()
+
+            BliqTotemTheme(boxTipo = BoxTipo.from(boxTipoRaw)) {
                 val navController = rememberNavController()
 
                 LaunchedEffect(Unit) {

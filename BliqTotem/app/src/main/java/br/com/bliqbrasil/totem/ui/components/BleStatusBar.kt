@@ -1,5 +1,6 @@
 package br.com.bliqbrasil.totem.ui.components
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
@@ -28,9 +29,13 @@ private fun configFor(status: ConnectionStatus) = when (status) {
     ConnectionStatus.CONNECTING   -> StatusConfig(Warning,  "Conectando...",          true,  false)
     ConnectionStatus.CONNECTED    -> StatusConfig(Success,  "CLP conectado",          false, false)
     ConnectionStatus.RECONNECTING -> StatusConfig(Warning,  "Reconectando ao CLP...", true,  false)
-    ConnectionStatus.ERROR        -> StatusConfig(Error,    "Falha na conexão",         false, true)
+    ConnectionStatus.ERROR        -> StatusConfig(Error,    "Falha na conexão",       false, true)
 }
 
+/**
+ * Chip de status do CLP. Nos mockups é uma pill de contorno sobre o fundo da
+ * tela — fundo transparente e borda fina —, não um card branco elevado.
+ */
 @Composable
 fun BleStatusBar(
     status: ConnectionStatus,
@@ -39,15 +44,16 @@ fun BleStatusBar(
     modifier: Modifier = Modifier,
 ) {
     val config = configFor(status)
+    val palette = LocalBoxPalette.current
 
-    Card(
+    Surface(
         modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(12.dp),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-        colors = CardDefaults.cardColors(containerColor = Surface),
+        shape = RoundedCornerShape(28.dp),
+        color = Color.Transparent,
+        border = BorderStroke(1.5.dp, palette.onBackground.copy(alpha = 0.55f)),
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+            modifier = Modifier.padding(horizontal = 20.dp, vertical = 16.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             if (config.showSpinner) {
@@ -60,22 +66,22 @@ fun BleStatusBar(
                 Box(modifier = Modifier.size(10.dp).background(config.dotColor, CircleShape))
             }
 
-            Spacer(Modifier.width(10.dp))
+            Spacer(Modifier.width(12.dp))
 
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = config.label,
                     fontFamily = Epilogue,
-                    fontSize = 13.sp,
+                    fontSize = 16.sp,
                     fontWeight = FontWeight.SemiBold,
-                    color = OnSurface,
+                    color = palette.onBackground,
                 )
                 if (status == ConnectionStatus.ERROR && errorMessage != null) {
                     Text(
                         text = errorMessage,
                         fontFamily = Epilogue,
-                        fontSize = 11.sp,
-                        color = Error,
+                        fontSize = 12.sp,
+                        color = palette.danger,
                         modifier = Modifier.padding(top = 2.dp),
                     )
                 }
@@ -84,10 +90,13 @@ fun BleStatusBar(
             if (config.showRetry) {
                 Button(
                     onClick = onForceRetry,
-                    colors = ButtonDefaults.buttonColors(containerColor = Primary),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = palette.contrast,
+                        contentColor   = palette.onContrast,
+                    ),
                     contentPadding = PaddingValues(horizontal = 14.dp, vertical = 7.dp),
                 ) {
-                    Text("Tentar agora", fontFamily = Epilogue, fontSize = 13.sp, color = Surface)
+                    Text("Tentar agora", fontFamily = Epilogue, fontSize = 13.sp)
                 }
             }
         }

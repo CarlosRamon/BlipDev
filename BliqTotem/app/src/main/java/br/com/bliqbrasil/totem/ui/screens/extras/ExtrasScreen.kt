@@ -35,21 +35,30 @@ fun ExtrasScreen(
     val totalMinutes   = washOption.minutes + extraMinutes
     val totalPrice     = washOption.price + extraPrice
 
+    val palette = LocalBoxPalette.current
+
     Scaffold(
+        contentWindowInsets = WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom),
         topBar = {
             TopAppBar(
                 title = { Text("Extras", fontFamily = FugazOne) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Voltar", tint = Surface)
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Voltar", tint = palette.onContrast)
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = Primary, titleContentColor = Surface),
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = palette.contrast, titleContentColor = palette.onContrast),
             )
         },
-        containerColor = Background,
+        containerColor = palette.background,
         bottomBar = {
-            Box(modifier = Modifier.padding(16.dp)) {
+            // O Scaffold NÃO repassa contentWindowInsets ao bottomBar — ele
+            // precisa consumir o inset da barra de navegação por conta própria.
+            Box(
+                modifier = Modifier
+                    .navigationBarsPadding()
+                    .padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = BliqDimens.BottomSafeGap)
+            ) {
                 PrimaryButton(
                     label = "Continuar para pagamento",
                     onClick = { onContinue(selectedExtras, totalMinutes, totalPrice) },
@@ -83,7 +92,7 @@ fun ExtrasScreen(
             }
 
             item {
-                Text("OPÇÕES DISPONÍVEIS", fontSize = 13.sp, fontFamily = Epilogue, fontWeight = FontWeight.SemiBold, color = Tertiary, letterSpacing = 0.5.sp)
+                Text("OPÇÕES DISPONÍVEIS", fontSize = 13.sp, fontFamily = Epilogue, fontWeight = FontWeight.SemiBold, color = palette.onBackground, letterSpacing = 0.5.sp)
             }
 
             items(washOption.extras, key = { it.id }) { extra ->
@@ -100,16 +109,16 @@ fun ExtrasScreen(
             item {
                 Card(
                     shape = RoundedCornerShape(14.dp),
-                    colors = CardDefaults.cardColors(containerColor = Primary),
+                    colors = CardDefaults.cardColors(containerColor = androidx.compose.ui.graphics.Color.Transparent),
                 ) {
                     Column(modifier = Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                            Text("Tempo total", fontFamily = Epilogue, color = Surface.copy(alpha = 0.8f), fontSize = 14.sp)
-                            Text("$totalMinutes min", fontFamily = Epilogue, color = Surface, fontWeight = FontWeight.SemiBold, fontSize = 15.sp)
+                            Text("Tempo total", fontFamily = Epilogue, color = palette.onBackground, fontSize = 17.sp)
+                            Text("$totalMinutes min", fontFamily = Epilogue, color = palette.onBackground, fontWeight = FontWeight.Bold, fontSize = 17.sp)
                         }
                         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                            Text("Valor total", fontFamily = Epilogue, color = Surface.copy(alpha = 0.8f), fontSize = 14.sp)
-                            Text(formatCurrency(totalPrice), fontFamily = FugazOne, color = Surface, fontSize = 22.sp)
+                            Text("Valor total", fontFamily = Epilogue, color = palette.onBackground, fontSize = 17.sp)
+                            Text(formatCurrency(totalPrice), fontFamily = FugazOne, color = palette.onBackground, fontSize = 26.sp)
                         }
                     }
                 }
@@ -120,11 +129,12 @@ fun ExtrasScreen(
 
 @Composable
 private fun ExtraCard(extra: WashOptionExtra, isSelected: Boolean, onToggle: () -> Unit) {
+    val palette = LocalBoxPalette.current
     Card(
         onClick = onToggle,
         shape = RoundedCornerShape(12.dp),
-        border = if (isSelected) BorderStroke(2.dp, Primary) else null,
-        colors = CardDefaults.cardColors(containerColor = if (isSelected) PrimaryLight else Surface),
+        border = if (isSelected) BorderStroke(2.dp, palette.accent) else null,
+        colors = CardDefaults.cardColors(containerColor = if (isSelected) palette.chipSoft else palette.surface),
         elevation = CardDefaults.cardElevation(2.dp),
     ) {
         Row(
@@ -136,7 +146,7 @@ private fun ExtraCard(extra: WashOptionExtra, isSelected: Boolean, onToggle: () 
                     extra.rotulo,
                     fontFamily = FugazOne,
                     fontSize = 15.sp,
-                    color = if (isSelected) Primary else OnSurface,
+                    color = if (isSelected) palette.accent else palette.accent,
                 )
                 Text("+ ${extra.minutos} minutos", fontFamily = Epilogue, fontSize = 13.sp, color = Secondary)
             }
@@ -145,13 +155,13 @@ private fun ExtraCard(extra: WashOptionExtra, isSelected: Boolean, onToggle: () 
                 formatCurrency(extra.preco),
                 fontFamily = FugazOne,
                 fontSize = 16.sp,
-                color = if (isSelected) Primary else OnSurface,
+                color = if (isSelected) palette.accent else palette.accent,
             )
             Spacer(Modifier.width(12.dp))
             Surface(
                 shape = RoundedCornerShape(6.dp),
-                border = BorderStroke(2.dp, if (isSelected) Primary else Tertiary),
-                color = if (isSelected) Primary else Surface,
+                border = BorderStroke(2.dp, if (isSelected) palette.accent else Tertiary),
+                color = if (isSelected) palette.accent else palette.surface,
                 modifier = Modifier.size(24.dp),
             ) {
                 if (isSelected) {

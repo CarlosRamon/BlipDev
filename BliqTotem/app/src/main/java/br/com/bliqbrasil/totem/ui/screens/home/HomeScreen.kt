@@ -14,9 +14,11 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -44,6 +46,7 @@ fun HomeScreen(
     val state     by viewModel.state.collectAsStateWithLifecycle()
     val bleStatus by viewModel.bleManager.status.collectAsStateWithLifecycle()
     val bleError  by viewModel.bleManager.errorMessage.collectAsStateWithLifecycle()
+    val palette = LocalBoxPalette.current
     val bleManager = viewModel.bleManager
 
     var logoTapCount by remember { mutableIntStateOf(0) }
@@ -98,16 +101,17 @@ fun HomeScreen(
     }
 
     Scaffold(
-        containerColor = Background,
+        contentWindowInsets = WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom),
+        containerColor = palette.background,
         topBar = {
             TopAppBar(
                 title = {},
                 actions = {
                     TextButton(onClick = onNavigateToSupport) {
-                        Text("Ajuda", fontFamily = Epilogue, color = Secondary, fontSize = 14.sp)
+                        Text("Ajuda", fontFamily = Epilogue, color = palette.onContrast, fontSize = 16.sp)
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = Background),
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = palette.contrast),
             )
         }
     ) { padding ->
@@ -116,7 +120,7 @@ fun HomeScreen(
                 .fillMaxSize()
                 .padding(padding)
                 .padding(horizontal = 32.dp),
-            contentPadding = PaddingValues(bottom = 32.dp),
+            contentPadding = PaddingValues(bottom = 32.dp + BliqDimens.BottomSafeGap),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             item {
@@ -128,6 +132,7 @@ fun HomeScreen(
                     Image(
                         painter = painterResource(R.drawable.bliq_tagline),
                         contentDescription = "Bliq",
+                        colorFilter = ColorFilter.tint(palette.logoTint),
                         modifier = Modifier
                             .fillMaxWidth(0.8f)
                             .padding(bottom = 16.dp)
@@ -143,25 +148,27 @@ fun HomeScreen(
                     )
                     state.config?.let { cfg ->
                         Text(
-                            text = cfg.box.nome,
-                            fontSize = 20.sp,
+                            text = cfg.box.nome.uppercase(),
+                            fontSize = 34.sp,
+                            lineHeight = 40.sp,
                             fontFamily = FugazOne,
-                            color = OnSurface,
+                            color = palette.onBackground,
+                            textAlign = TextAlign.Center,
                         )
                     }
                     Text(
-                        text = if (state.boxTipo == "ASPIRACAO") "Selecione a aspiração" else "Selecione a lavagem",
-                        fontSize = 15.sp,
+                        text = if (state.boxTipo == "ASPIRACAO") "Selecione a aspiração:" else "Selecione a lavagem:",
+                        fontSize = 17.sp,
                         fontFamily = Epilogue,
-                        color = Secondary,
+                        color = palette.onBackground,
                         modifier = Modifier.padding(top = 4.dp),
                     )
                     state.config?.let { cfg ->
                         Text(
                             text = cfg.franqueado.nome,
-                            fontSize = 12.sp,
+                            fontSize = 13.sp,
                             fontFamily = Epilogue,
-                            color = Tertiary,
+                            color = palette.onBackground.copy(alpha = 0.75f),
                             modifier = Modifier.padding(top = 2.dp),
                         )
                     }
@@ -188,9 +195,9 @@ fun HomeScreen(
                         contentAlignment = Alignment.Center,
                     ) {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            CircularProgressIndicator(color = Primary)
+                            CircularProgressIndicator(color = palette.onBackground)
                             Spacer(Modifier.height(12.dp))
-                            Text("Carregando...", fontSize = 14.sp, fontFamily = Epilogue, color = Secondary)
+                            Text("Carregando...", fontSize = 15.sp, fontFamily = Epilogue, color = palette.onBackground)
                         }
                     }
                 }
@@ -222,7 +229,7 @@ fun HomeScreen(
                 }
 
                 else -> items(state.washOptions, key = { it.id }) { option ->
-                    ProductCard(option = option, onClick = {
+                    ProductCard(palette = palette, option = option, onClick = {
                         val boxTipo = state.boxTipo
                         when {
                             option.tipo == "MINUTAGEM_AVULSA" -> onNavigateToMinutesPicker(option, boxTipo, clienteId)
@@ -283,53 +290,60 @@ private fun BleDebugCard(info: Map<String, String>, boxTipo: String) {
 }
 
 @Composable
-private fun ProductCard(option: WashOption, onClick: () -> Unit) {
+private fun ProductCard(palette: BoxPalette, option: WashOption, onClick: () -> Unit) {
+    // Minutagem avulsa é o card de destaque do Figma: pintado na cor de contraste
+    // (navy na Lavação, azul na Aspiração) em vez de branco.
+    val isHighlight = option.tipo == "MINUTAGEM_AVULSA"
+    val cardColor   = if (isHighlight) palette.contrast else palette.surface
+    val titleColor  = if (isHighlight) palette.onContrast else palette.accent
+    val bodyColor   = if (isHighlight) palette.onContrast.copy(alpha = 0.85f) else palette.onSurface
+    val priceColor  = if (isHighlight) palette.onContrast else palette.accent
+
     Card(
         modifier = Modifier.fillMaxWidth().clickable(onClick = onClick),
-        shape = RoundedCornerShape(14.dp),
+        shape = RoundedCornerShape(18.dp),
         elevation = CardDefaults.cardElevation(3.dp),
-        colors = CardDefaults.cardColors(containerColor = Surface),
+        colors = CardDefaults.cardColors(containerColor = cardColor),
     ) {
         Row(
-            modifier = Modifier.padding(20.dp),
+            modifier = Modifier.padding(horizontal = 20.dp, vertical = 18.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Box(
-                modifier = Modifier
-                    .width(4.dp)
-                    .height(60.dp)
-                    .background(Primary, RoundedCornerShape(2.dp))
-            )
-            Spacer(Modifier.width(16.dp))
             Column(modifier = Modifier.weight(1f)) {
-                Text(option.label, fontSize = 17.sp, fontFamily = FugazOne, color = OnSurface)
-                if (option.tipo == "MINUTAGEM_AVULSA") {
-                    Text("tempo à escolha", fontSize = 13.sp, fontFamily = Epilogue, color = Secondary)
+                Text(
+                    option.label.uppercase(),
+                    fontSize = 19.sp,
+                    fontFamily = FugazOne,
+                    color = titleColor,
+                )
+                if (isHighlight) {
+                    Text("tempo à escolha", fontSize = 15.sp, fontFamily = Epilogue, color = bodyColor)
                 } else {
-                    Text("${option.minutes} minutos", fontSize = 13.sp, fontFamily = Epilogue, color = Secondary)
+                    Text("${option.minutes} minutos", fontSize = 15.sp, fontFamily = Epilogue, color = bodyColor)
                     if (option.extras.isNotEmpty()) {
                         val n = option.extras.size
                         Text(
                             text = "$n opção${if (n > 1) "ões" else ""} de extra",
-                            fontSize = 11.sp,
+                            fontSize = 14.sp,
                             fontFamily = Epilogue,
-                            color = Primary,
-                            fontWeight = FontWeight.Medium,
+                            color = bodyColor,
+                            fontWeight = FontWeight.SemiBold,
+                            textDecoration = TextDecoration.Underline,
                         )
                     }
                 }
             }
             Row(verticalAlignment = Alignment.CenterVertically) {
-                if (option.tipo == "MINUTAGEM_AVULSA") {
+                if (isHighlight) {
                     Column(horizontalAlignment = Alignment.End) {
-                        Text(formatCurrency(option.price), fontSize = 20.sp, fontFamily = FugazOne, color = Primary)
-                        Text("/ min", fontSize = 11.sp, fontFamily = Epilogue, color = Secondary)
+                        Text(formatCurrency(option.price), fontSize = 24.sp, fontFamily = FugazOne, color = priceColor)
+                        Text("/ min", fontSize = 12.sp, fontFamily = Epilogue, color = bodyColor)
                     }
                 } else {
-                    Text(formatCurrency(option.price), fontSize = 20.sp, fontFamily = FugazOne, color = Primary)
+                    Text(formatCurrency(option.price), fontSize = 24.sp, fontFamily = FugazOne, color = priceColor)
                 }
-                Spacer(Modifier.width(8.dp))
-                Text("›", fontSize = 24.sp, fontFamily = Epilogue, color = Tertiary)
+                Spacer(Modifier.width(10.dp))
+                Text("\u203A", fontSize = 26.sp, fontFamily = Epilogue, color = priceColor)
             }
         }
     }

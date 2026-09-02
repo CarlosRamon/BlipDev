@@ -3,20 +3,21 @@ package br.com.bliqbrasil.totem.ui.theme
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 
-// ── Paleta oficial Bliq (Projeto de Marca — Identidade Visual) ────────────────
-// Extraída da apresentação de marca:
-//   Azul Bliq   #1679ED  — primária (idêntica ao logo)
-//   Deep Navy   #001B2D  — texto forte, superfícies escuras
-//   Off-white   #EDEDED  — fundo institucional
+// ── Paleta oficial Bliq ───────────────────────────────────────────────────────
+// Valores extraídos por amostragem de pixel dos mockups do Figma
+// ("Figma Bliq Totem"), que são a fonte da verdade do layout:
+//   Azul Bliq  #307FE2 — primária
+//   Deep Navy  #051C2C — superfícies escuras, texto forte
+//   Azul suave #EBF3FC — pastilhas e chips sobre superfície branca
 
-val BliqBlue      = Color(0xFF1679ED)
-val BliqBlueDeep  = Color(0xFF0D5CB6)
-val BliqBlueSoft  = Color(0xFFE8F1FE)
-val BliqNavy      = Color(0xFF001B2D)
+val BliqBlue      = Color(0xFF307FE2)
+val BliqBlueDeep  = Color(0xFF1F63BE)
+val BliqBlueSoft  = Color(0xFFEBF3FC)
+val BliqNavy      = Color(0xFF051C2C)
 val BliqNavySoft  = Color(0xFF1F3448)
 val BliqOffWhite  = Color(0xFFEDEDED)
 
-// ── Tokens semânticos (usados pelo MaterialTheme e por toda a UI) ──────────────
+// ── Tokens semânticos fixos (não variam por tipo de box) ──────────────────────
 
 val Primary      = BliqBlue
 val PrimaryDeep  = BliqBlueDeep
@@ -26,24 +27,19 @@ val Surface      = Color(0xFFFFFFFF)
 val OnSurface    = BliqNavy
 val Secondary    = Color(0xFF4A5B6E)
 val Tertiary     = Color(0xFF8695A6)
-val Divider      = Color(0xFFE1E5EA)
+val Divider      = Color(0xFFE2E5EB)
 
-// ── Cores de estado ────────────────────────────────────────────────────────────
+// ── Cores de estado ───────────────────────────────────────────────────────────
 
-val Success      = Color(0xFF1FA96A)
-val SuccessLight = Color(0xFFE1F4EB)
+// Verde da marca, amostrado dos mockups: é um teal, não o verde puro anterior.
+val Success      = Color(0xFF2EC4B6)
+val SuccessLight = Color(0xFFDCF3F0)
 val Warning      = Color(0xFFF5A524)
 val WarningLight = Color(0xFFFDF0DC)
 val Error        = Color(0xFFE0364B)
 val ErrorSurface = Color(0xFFFCE5E9)
 
-// ── Cores de máquina / categorias auxiliares ──────────────────────────────────
-
-val Purple       = Color(0xFF7A3EE8)
-val Teal         = Color(0xFF00A79D)
-
-// ── Gradientes de marca ────────────────────────────────────────────────────────
-// Usar via Modifier.background(BrandGradientHero) em headers/CTAs.
+// ── Gradientes de marca ───────────────────────────────────────────────────────
 
 val BrandGradientHero: Brush = Brush.linearGradient(
     colors = listOf(BliqBlue, BliqBlueDeep),
