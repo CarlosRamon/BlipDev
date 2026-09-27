@@ -21,7 +21,8 @@ find app/build/outputs/apk -name "*release*.apk" -not -name "*unsigned*" -exec c
 
 echo "→ Compactando em releases/$VERSION.rar..."
 cd releases
-rar a "$VERSION.rar" "$VERSION/"
+rm -f "$VERSION.rar"
+rar a -ep1 "$VERSION.rar" "$VERSION/"
 cd ..
 
 echo ""
