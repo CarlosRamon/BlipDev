@@ -1,6 +1,7 @@
 package br.com.bliqbrasil.totem.ui.screens.session
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
@@ -12,16 +13,22 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import br.com.bliqbrasil.totem.data.model.ConnectionStatus
 import br.com.bliqbrasil.totem.data.model.Machine
 import br.com.bliqbrasil.totem.ui.components.BleStatusBar
+import br.com.bliqbrasil.totem.ui.components.PrimaryButton
 import br.com.bliqbrasil.totem.ui.components.machineIcon
 import br.com.bliqbrasil.totem.ui.theme.*
+import br.com.bliqbrasil.totem.util.formatCurrency
 import br.com.bliqbrasil.totem.util.formatTime
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -29,6 +36,7 @@ import br.com.bliqbrasil.totem.util.formatTime
 fun SessionScreen(
     viewModel: SessionViewModel,
     onFinished: () -> Unit,
+    onAcceptOffer: (SessionViewModel.Offer) -> Unit = {},
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val bleStatus by viewModel.bleManager.status.collectAsStateWithLifecycle()
@@ -41,7 +49,19 @@ fun SessionScreen(
 
     DisposableEffect(viewModel) {
         viewModel.setOnFinished(onFinished)
-        onDispose { viewModel.setOnFinished {} }
+        viewModel.setOnAcceptOffer(onAcceptOffer)
+        onDispose {
+            viewModel.setOnFinished {}
+            viewModel.setOnAcceptOffer {}
+        }
+    }
+
+    state.offer?.let { offer ->
+        CrossSellDialog(
+            offer = offer,
+            onAccept  = viewModel::acceptOffer,
+            onDecline = viewModel::declineOffer,
+        )
     }
 
     // Detecta transição isPaused true→false e exibe snackbar de reconexão
@@ -279,6 +299,94 @@ private fun MachineCard(
                 Box(modifier = Modifier.size(8.dp).background(palette.onContrast, CircleShape))
             } else {
                 Text("\u203A", fontFamily = Epilogue, fontSize = 20.sp, color = Tertiary)
+            }
+        }
+    }
+}
+
+/**
+ * Oferta de minutos extras exibida quando o pacote termina por tempo. Não é
+ * dispensável por toque fora nem pelo botão voltar: as três saídas são SIM, NÃO
+ * e o fim da contagem, para o totem nunca ficar parado numa tela sem dono.
+ */
+@Composable
+private fun CrossSellDialog(
+    offer: SessionViewModel.Offer,
+    onAccept: () -> Unit,
+    onDecline: () -> Unit,
+) {
+    val palette = LocalBoxPalette.current
+
+    Dialog(
+        onDismissRequest = {},
+        properties = DialogProperties(dismissOnBackPress = false, dismissOnClickOutside = false),
+    ) {
+        Surface(
+            shape = RoundedCornerShape(24.dp),
+            color = palette.surface,
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(28.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(20.dp),
+            ) {
+                Text(
+                    "QUER MAIS ${offer.minutos} MINUTOS?",
+                    fontFamily = FugazOne,
+                    fontSize = 26.sp,
+                    color = palette.onSurface,
+                    textAlign = TextAlign.Center,
+                    lineHeight = 32.sp,
+                )
+                Text(
+                    formatCurrency(offer.preco),
+                    fontFamily = FugazOne,
+                    fontSize = 40.sp,
+                    color = palette.contrast,
+                )
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    // OutlineButton não serve aqui: ele pinta o texto com
+                    // palette.onBackground (branco, para o fundo da tela), que
+                    // desaparece sobre o branco deste card. Dentro da superfície
+                    // quem contrasta é onSurface.
+                    OutlinedButton(
+                        onClick = onDecline,
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(60.dp),
+                        // mesmo raio do PrimaryButton ao lado, que mantém o seu privado
+                        shape = RoundedCornerShape(16.dp),
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = palette.onSurface),
+                        border = BorderStroke(1.5.dp, palette.onSurface.copy(alpha = 0.3f)),
+                    ) {
+                        Text("Não", style = BliqTextStyles.CtaLabel)
+                    }
+                    PrimaryButton(label = "Sim", onClick = onAccept, modifier = Modifier.weight(1f))
+                }
+
+                // A barra encolhendo deixa claro que a oferta vai embora sozinha,
+                // sem exigir que o cliente leia o número.
+                LinearProgressIndicator(
+                    progress = { offer.secondsLeft.toFloat() / SessionViewModel.OFFER_SECONDS },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(6.dp)
+                        .clip(RoundedCornerShape(3.dp)),
+                    color = palette.contrast,
+                    trackColor = palette.contrast.copy(alpha = 0.15f),
+                )
+                Text(
+                    "Esta oferta some em ${offer.secondsLeft}s",
+                    fontFamily = Epilogue,
+                    fontSize = 14.sp,
+                    color = Secondary,
+                )
             }
         }
     }

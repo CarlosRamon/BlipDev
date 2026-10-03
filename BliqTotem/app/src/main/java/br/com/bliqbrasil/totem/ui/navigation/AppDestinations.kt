@@ -38,6 +38,9 @@ object AppDestinations {
         val totalPrice: Double,
         val boxTipo: String = "LAVACAO",
         val clienteId: String = "",
+        // Compra nascida da oferta do fim do ciclo anterior; segue até o
+        // criarCiclo para o backend marcar a origem.
+        val crossSell: Boolean = false,
     )
 
     @Serializable
@@ -49,6 +52,7 @@ object AppDestinations {
         val paymentMethod: String,
         val boxTipo: String = "LAVACAO",
         val clienteId: String = "",
+        val crossSell: Boolean = false,
     )
 
     @Serializable
@@ -59,6 +63,11 @@ object AppDestinations {
         val cicloId: String,
         val transacaoId: String,
         val boxTipo: String = "LAVACAO",
+        // Repassados à sessão: o cliente para vincular a eventual recompra, e a
+        // oferta a exibir quando o tempo acabar.
+        val clienteId: String = "",
+        val crossSellMinutos: Int? = null,
+        val crossSellPreco: Double? = null,
     )
 
     @Serializable
@@ -69,6 +78,13 @@ object AppDestinations {
         val paymentMethod: String? = null,
         val totalPrice: Double? = null,
         val resumeFromSeconds: Int? = null,
+        val clienteId: String = "",
+        // Nulos quando o pacote não tem oferta configurada, quando a sessão é
+        // uma retomada (o app reiniciou e não temos mais o produto em mãos) ou
+        // quando esta própria sessão já veio de uma oferta aceita — ela é
+        // oferecida uma vez só.
+        val crossSellMinutos: Int? = null,
+        val crossSellPreco: Double? = null,
     )
 }
 

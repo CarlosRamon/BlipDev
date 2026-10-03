@@ -77,6 +77,10 @@ class HomeViewModel(
                             minutes = p.tempoMinutos ?: 1,
                             price = p.preco.toDoubleOrNull() ?: 0.0,
                             tipo = p.tipo,
+                            // Só leva a oferta adiante quando ela está completa:
+                            // o totem nunca deve exibir "mais null minutos".
+                            crossSellMinutos = p.crossSellMinutos.takeIf { p.crossSellAtivo },
+                            crossSellPreco = p.crossSellPreco?.toDoubleOrNull().takeIf { p.crossSellAtivo },
                             extras = p.extras.map { e ->
                                 WashOptionExtra(
                                     id = e.id,

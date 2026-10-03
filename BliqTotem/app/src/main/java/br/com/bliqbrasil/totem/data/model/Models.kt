@@ -60,6 +60,11 @@ data class Produto(
     val preco: String,
     val boxId: String,
     val extras: List<ProdutoExtra>,
+    // Oferta de minutos extras exibida quando ESTE pacote termina por tempo.
+    // O que o cliente compra é minutagem avulsa, não um extra deste produto.
+    val crossSellAtivo: Boolean = false,
+    val crossSellMinutos: Int? = null,
+    val crossSellPreco: String? = null,
 )
 
 data class ProdutoExtra(
@@ -124,6 +129,7 @@ data class CriarCicloRequest(
     val valor: Double,
     val transacaoId: String? = null,
     val clienteId: String? = null,
+    val crossSell: Boolean = false,
 )
 
 data class CriarClienteRequest(
@@ -164,6 +170,10 @@ data class WashOption(
     val price: Double,
     val tipo: String = "TEMPO_FIXO",
     val extras: List<WashOptionExtra>,
+    // Oferta do fim do ciclo, quando o franqueado configurou uma para o pacote.
+    // Viaja junto na navegação até a sessão, que é quem a exibe.
+    val crossSellMinutos: Int? = null,
+    val crossSellPreco: Double? = null,
 )
 
 @Serializable

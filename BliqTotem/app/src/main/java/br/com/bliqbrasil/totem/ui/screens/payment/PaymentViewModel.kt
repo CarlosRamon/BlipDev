@@ -30,6 +30,7 @@ class PaymentViewModel(
     private val totalPrice: Double,
     val paymentMethod: PaymentMethod,
     private val clienteId: String = "",
+    private val crossSell: Boolean = false,
 ) : ViewModel() {
 
     data class UiState(
@@ -121,6 +122,7 @@ class PaymentViewModel(
                 valor           = totalPrice,
                 transacaoId     = state.result.acquirerTransactionKey,
                 clienteId       = clienteId.ifBlank { null },
+                crossSell       = crossSell,
             )
             if (cicloResult.isFailure) {
                 val ex = cicloResult.exceptionOrNull()
@@ -166,9 +168,10 @@ class PaymentViewModel(
         private val totalPrice: Double,
         private val paymentMethod: PaymentMethod,
         private val clienteId: String = "",
+        private val crossSell: Boolean = false,
     ) : ViewModelProvider.Factory {
         @Suppress("UNCHECKED_CAST")
         override fun <T : ViewModel> create(modelClass: Class<T>): T =
-            PaymentViewModel(stone, repository, washOption, selectedExtras, totalMinutes, totalPrice, paymentMethod, clienteId) as T
+            PaymentViewModel(stone, repository, washOption, selectedExtras, totalMinutes, totalPrice, paymentMethod, clienteId, crossSell) as T
     }
 }

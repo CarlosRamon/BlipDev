@@ -7,6 +7,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.toRoute
 import br.com.bliqbrasil.totem.BliqTotemApp
+import br.com.bliqbrasil.totem.data.model.WashOption
 import br.com.bliqbrasil.totem.data.model.WashOptionExtra
 import br.com.bliqbrasil.totem.ui.screens.activation.ActivationScreen
 import br.com.bliqbrasil.totem.ui.screens.support.SupportScreen
@@ -217,6 +218,7 @@ fun NavGraph(navController: NavHostController, app: BliqTotemApp) {
                             paymentMethod      = method.toNavString(),
                             boxTipo            = route.boxTipo,
                             clienteId          = route.clienteId,
+                            crossSell          = route.crossSell,
                         )
                     )
                 }
@@ -235,11 +237,13 @@ fun NavGraph(navController: NavHostController, app: BliqTotemApp) {
                     totalPrice     = route.totalPrice,
                     paymentMethod  = route.paymentMethod.toPaymentMethod(),
                     clienteId      = route.clienteId,
+                    crossSell      = route.crossSell,
                 )
             )
             PaymentScreen(
                 viewModel = vm,
                 onSuccess = { cicloId, acquirerKey ->
+                    val washOption = route.washOptionJson.toWashOption()
                     navController.navigate(
                         AppDestinations.Success(
                             paymentMethod = route.paymentMethod,
@@ -248,6 +252,11 @@ fun NavGraph(navController: NavHostController, app: BliqTotemApp) {
                             cicloId       = cicloId,
                             transacaoId   = acquirerKey,
                             boxTipo       = route.boxTipo,
+                            clienteId     = route.clienteId,
+                            // Uma compra que já veio da oferta não oferece de novo:
+                            // o cross-sell acontece uma vez por pacote.
+                            crossSellMinutos = washOption.crossSellMinutos.takeIf { !route.crossSell },
+                            crossSellPreco   = washOption.crossSellPreco.takeIf { !route.crossSell },
                         )
                     ) { popUpTo(AppDestinations.Checkout::class) { inclusive = true } }
                 },
@@ -273,11 +282,14 @@ fun NavGraph(navController: NavHostController, app: BliqTotemApp) {
                 onSessionReady = { cicloId ->
                     navController.navigate(
                         AppDestinations.Session(
-                            cicloId       = cicloId,
-                            totalMinutes  = route.totalMinutes,
-                            boxTipo       = route.boxTipo,
-                            paymentMethod = route.paymentMethod,
-                            totalPrice    = route.totalPrice,
+                            cicloId          = cicloId,
+                            totalMinutes     = route.totalMinutes,
+                            boxTipo          = route.boxTipo,
+                            paymentMethod    = route.paymentMethod,
+                            totalPrice       = route.totalPrice,
+                            clienteId        = route.clienteId,
+                            crossSellMinutos = route.crossSellMinutos,
+                            crossSellPreco   = route.crossSellPreco,
                         )
                     ) { popUpTo(AppDestinations.Success::class) { inclusive = true } }
                 },
@@ -299,6 +311,9 @@ fun NavGraph(navController: NavHostController, app: BliqTotemApp) {
                     totalMinutes      = route.totalMinutes,
                     resumeFromSeconds = route.resumeFromSeconds,
                     boxTipo           = route.boxTipo,
+                    clienteId         = route.clienteId,
+                    crossSellMinutos  = route.crossSellMinutos,
+                    crossSellPreco    = route.crossSellPreco,
                 )
             )
             SessionScreen(
@@ -307,7 +322,30 @@ fun NavGraph(navController: NavHostController, app: BliqTotemApp) {
                     navController.navigate(AppDestinations.Welcome) {
                         popUpTo(0) { inclusive = true }
                     }
-                }
+                },
+                // Aceitou os minutos extras: vira uma compra de minutagem avulsa,
+                // pelo mesmo caminho de sempre (método de pagamento → Stone).
+                onAcceptOffer = { offer ->
+                    val avulso = WashOption(
+                        id      = offer.produtoAvulsoId,
+                        label   = "Mais ${offer.minutos} min",
+                        minutes = offer.minutos,
+                        price   = offer.preco,
+                        tipo    = "MINUTAGEM_AVULSA",
+                        extras  = emptyList(),
+                    )
+                    navController.navigate(
+                        AppDestinations.Checkout(
+                            washOptionJson     = avulso.toJson(),
+                            selectedExtrasJson = emptyList<WashOptionExtra>().toJson(),
+                            totalMinutes       = offer.minutos,
+                            totalPrice         = offer.preco,
+                            boxTipo            = route.boxTipo,
+                            clienteId          = route.clienteId,
+                            crossSell          = true,
+                        )
+                    ) { popUpTo(0) { inclusive = true } }
+                },
             )
         }
 

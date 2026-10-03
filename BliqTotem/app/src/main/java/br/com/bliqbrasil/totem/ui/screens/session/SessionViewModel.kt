@@ -27,6 +27,9 @@ class SessionViewModel(
     val totalMinutes: Int,
     val resumeFromSeconds: Int?,
     val boxTipo: String = "LAVACAO",
+    private val clienteId: String = "",
+    private val crossSellMinutos: Int? = null,
+    private val crossSellPreco: Double? = null,
 ) : ViewModel() {
 
     val machines: List<Machine> = machinesForTipo(boxTipo)
@@ -40,6 +43,16 @@ class SessionViewModel(
         val isEnding: Boolean = false,
         val isPaused: Boolean = false,
         val bleError: String? = null,
+        // Oferta de minutos extras no fim do ciclo. Não-nula apenas enquanto a
+        // contagem regressiva está na tela.
+        val offer: Offer? = null,
+    )
+
+    data class Offer(
+        val minutos: Int,
+        val preco: Double,
+        val produtoAvulsoId: String,
+        val secondsLeft: Int,
     )
 
     private val _state = MutableStateFlow(
@@ -65,6 +78,60 @@ class SessionViewModel(
         listenForBleConnectToResync()
         listenForClpNotifications()
         startHeartbeat()
+        prefetchProdutoAvulso()
+    }
+
+    // ── Cross-sell ────────────────────────────────────────────────────────
+
+    /**
+     * O id do produto de minutagem avulsa do box, resolvido no começo da sessão.
+     * Buscar isso só no fim seria pedir para a oferta não aparecer justamente
+     * quando a rede falha — e são 30 segundos, sem tempo para uma ida à API.
+     */
+    private var produtoAvulsoId: String? = null
+    private var offerJob: Job? = null
+
+    private fun prefetchProdutoAvulso() {
+        if (crossSellMinutos == null || crossSellPreco == null) return
+        viewModelScope.launch {
+            repository.getConfig().getOrNull()?.let { config ->
+                produtoAvulsoId = config.produtos
+                    .firstOrNull { it.tipo == "MINUTAGEM_AVULSA" }
+                    ?.id
+            }
+        }
+    }
+
+    private fun startOffer(minutos: Int, preco: Double, produtoId: String) {
+        _state.update {
+            it.copy(offer = Offer(minutos, preco, produtoId, secondsLeft = OFFER_SECONDS))
+        }
+        offerJob = viewModelScope.launch {
+            while (true) {
+                delay(1_000)
+                val restante = (_state.value.offer?.secondsLeft ?: 0) - 1
+                if (restante <= 0) {
+                    // Ninguém respondeu: a oferta sai sozinha e o totem volta ao início.
+                    _state.update { it.copy(offer = null) }
+                    onFinished()
+                    break
+                }
+                _state.update { s -> s.copy(offer = s.offer?.copy(secondsLeft = restante)) }
+            }
+        }
+    }
+
+    fun declineOffer() {
+        offerJob?.cancel()
+        _state.update { it.copy(offer = null) }
+        onFinished()
+    }
+
+    fun acceptOffer() {
+        val offer = _state.value.offer ?: return
+        offerJob?.cancel()
+        _state.update { it.copy(offer = null) }
+        onAcceptOffer(offer)
     }
 
     // ── Timer ─────────────────────────────────────────────────────────────
@@ -253,14 +320,29 @@ class SessionViewModel(
             )
         }
 
-        onFinished()
+        // A oferta só faz sentido quando o pacote chegou ao fim por tempo: quem
+        // encerrou na mão, ou teve a sessão interrompida pelo equipamento, está
+        // indo embora.
+        val produtoId = produtoAvulsoId
+        if (automatic && !espInitiated && crossSellMinutos != null && crossSellPreco != null && produtoId != null) {
+            startOffer(crossSellMinutos, crossSellPreco, produtoId)
+        } else {
+            onFinished()
+        }
     }
 
     private var onFinished: () -> Unit = {}
+    private var onAcceptOffer: (Offer) -> Unit = {}
 
     fun setOnFinished(callback: () -> Unit) {
         onFinished = callback
     }
+
+    fun setOnAcceptOffer(callback: (Offer) -> Unit) {
+        onAcceptOffer = callback
+    }
+
+    val clienteIdAtual: String get() = clienteId
 
     private suspend fun ensureConnected() {
         if (bleManager.status.value != ConnectionStatus.CONNECTED) {
@@ -269,6 +351,9 @@ class SessionViewModel(
     }
 
     companion object {
+        /** Tempo que a oferta fica na tela antes de sumir sozinha. */
+        const val OFFER_SECONDS = 30
+
         fun factory(
             repository: PosRepository,
             bleManager: BliqBleManager,
@@ -276,10 +361,16 @@ class SessionViewModel(
             totalMinutes: Int,
             resumeFromSeconds: Int?,
             boxTipo: String = "LAVACAO",
+            clienteId: String = "",
+            crossSellMinutos: Int? = null,
+            crossSellPreco: Double? = null,
         ) = object : ViewModelProvider.Factory {
             override fun <T : ViewModel> create(modelClass: Class<T>): T {
                 @Suppress("UNCHECKED_CAST")
-                return SessionViewModel(repository, bleManager, cicloId, totalMinutes, resumeFromSeconds, boxTipo) as T
+                return SessionViewModel(
+                    repository, bleManager, cicloId, totalMinutes, resumeFromSeconds, boxTipo,
+                    clienteId, crossSellMinutos, crossSellPreco,
+                ) as T
             }
         }
     }

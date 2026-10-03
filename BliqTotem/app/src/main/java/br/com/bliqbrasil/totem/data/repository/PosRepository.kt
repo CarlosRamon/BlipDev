@@ -53,9 +53,10 @@ class PosRepository(private val api: ApiService) {
         valor: Double,
         transacaoId: String?,
         clienteId: String? = null,
+        crossSell: Boolean = false,
     ): Result<Ciclo> = try {
         Result.success(
-            api.criarCiclo(CriarCicloRequest(produtoId, tempoContratado, metodoPagamento, valor, transacaoId, clienteId))
+            api.criarCiclo(CriarCicloRequest(produtoId, tempoContratado, metodoPagamento, valor, transacaoId, clienteId, crossSell))
         )
     } catch (e: HttpException) {
         if (e.code() == 409) {
