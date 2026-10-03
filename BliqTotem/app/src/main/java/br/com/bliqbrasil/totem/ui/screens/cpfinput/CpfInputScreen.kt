@@ -314,7 +314,10 @@ private fun NotFoundContent(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .imePadding()
+            // Sem imePadding: o Scaffold já consome o IME via contentWindowInsets
+            // (safeDrawing inclui o teclado). Descontar de novo aqui encolhia o
+            // viewport do scroll em 2x a altura do teclado, e o bringIntoView do
+            // campo focado empurrava o topo do formulário para fora da tela.
             .verticalScroll(rememberScrollState())
             .pointerInput(Unit) { detectTapGestures { focusManager.clearFocus() } }
             .padding(top = 32.dp, bottom = 24.dp + BliqDimens.BottomSafeGap),
