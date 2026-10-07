@@ -1,5 +1,8 @@
 package br.com.bliqbrasil.totem.ui.screens.cpfinput
 
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
@@ -141,7 +144,7 @@ fun CpfInputScreen(
                 CpfStep.ENTERING_CPF, CpfStep.LOADING ->
                     EnteringCpfContent(state, viewModel, onSkip = { onContinue("") })
                 CpfStep.FOUND ->
-                    FoundContent(state, onContinue = { onContinue(state.clienteEncontrado!!.id) }, onSkip = { onContinue("") })
+                    FoundContent(state, onContinue = { onContinue(state.clienteEncontrado!!.id) })
                 CpfStep.NOT_FOUND, CpfStep.REGISTERING ->
                     NotFoundContent(state, viewModel, onSuccess = onContinue, onSkip = { onContinue("") })
             }
@@ -254,10 +257,17 @@ private fun EnteringCpfContent(
 private fun FoundContent(
     state: CpfInputViewModel.UiState,
     onContinue: () -> Unit,
-    onSkip: () -> Unit,
 ) {
     val palette = LocalBoxPalette.current
     val cliente = state.clienteEncontrado ?: return
+
+    // Avança sozinho para os produtos depois de 3s, sem exigir toque.
+    val currentOnContinue by rememberUpdatedState(onContinue)
+    val progress = remember { Animatable(0f) }
+    LaunchedEffect(cliente.id) {
+        progress.animateTo(1f, animationSpec = tween(durationMillis = 3_000, easing = LinearEasing))
+        currentOnContinue()
+    }
 
     Column(
         modifier = Modifier
@@ -286,8 +296,21 @@ private fun FoundContent(
         }
 
         Spacer(Modifier.height(16.dp))
-        PrimaryButton(label = "Continuar", onClick = onContinue)
-        OutlineButton(label = "Não sou eu", onClick = onSkip)
+        LinearProgressIndicator(
+            progress = { progress.value },
+            modifier = Modifier
+                .fillMaxWidth(0.6f)
+                .height(6.dp),
+            color = palette.onBackground,
+            trackColor = palette.onBackground.copy(alpha = 0.2f),
+            drawStopIndicator = {},
+        )
+        Text(
+            "Seguindo para os produtos...",
+            fontFamily = Epilogue,
+            fontSize = 15.sp,
+            color = palette.onBackground.copy(alpha = 0.85f),
+        )
     }
 }
 
