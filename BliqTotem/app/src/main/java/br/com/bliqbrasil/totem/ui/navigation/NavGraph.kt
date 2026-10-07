@@ -1,5 +1,6 @@
 package br.com.bliqbrasil.totem.ui.navigation
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.runtime.Composable
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
@@ -205,9 +206,21 @@ fun NavGraph(navController: NavHostController, app: BliqTotemApp) {
                     totalPrice     = route.totalPrice,
                 )
             )
+            // Vindo da oferta do fim da sessão, o Checkout é a única tela na
+            // pilha (a navegação limpou tudo): voltar leva à tela inicial.
+            val goBack: () -> Unit = {
+                if (navController.previousBackStackEntry != null) {
+                    navController.popBackStack()
+                } else {
+                    navController.navigate(AppDestinations.Welcome) {
+                        popUpTo(0) { inclusive = true }
+                    }
+                }
+            }
+            BackHandler(onBack = goBack)
             CheckoutScreen(
                 viewModel = vm,
-                onBack = { navController.popBackStack() },
+                onBack = goBack,
                 onConfirm = { method ->
                     navController.navigate(
                         AppDestinations.Payment(
