@@ -4,12 +4,20 @@ import android.Manifest
 import android.bluetooth.*
 import android.bluetooth.le.ScanCallback
 import android.bluetooth.le.ScanResult
+import android.content.BroadcastReceiver
 import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.os.Build
+import android.os.SystemClock
 import android.util.Log
 import androidx.core.content.ContextCompat
 import br.com.bliqbrasil.totem.data.model.ConnectionStatus
+import br.com.bliqbrasil.totem.diagnostics.Categoria
+import br.com.bliqbrasil.totem.diagnostics.DiagnosticLogger
+import br.com.bliqbrasil.totem.diagnostics.Severidade
+import org.json.JSONObject
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -32,7 +40,10 @@ private const val KEEPALIVE_INTERVAL_MS = 30_000L
 // Backoff delays between retry attempts: 3s, 5s, 8s, 12s, 15s, 15s…
 private val RECONNECT_DELAYS = listOf(3_000L, 5_000L, 8_000L, 12_000L, 15_000L)
 
-class BliqBleManager(private val context: Context) {
+class BliqBleManager(
+    private val context: Context,
+    private val diagnostico: DiagnosticLogger,
+) {
 
     // ── BLE config (configured after loading PosConfig) ──────────────────
 
@@ -93,6 +104,41 @@ class BliqBleManager(private val context: Context) {
     private var descriptorCont: CancellableContinuation<Unit>? = null
     @Volatile private var rssiCont: CancellableContinuation<Unit>? = null
 
+    // ── Diagnóstico ───────────────────────────────────────────────────────
+    // Estado só para o registro de problemas — não interfere na conexão.
+
+    /** Onde a tentativa de conexão está; diz em que passo ela falhou. */
+    @Volatile private var etapa = "SCAN"
+    private var conectadoDesde: Long? = null
+    private var foraDoArDesde: Long? = null
+    private var falhasSeguidas = 0
+    private var ultimoErro: String? = null
+    @Volatile private var ultimoGattStatus: Int? = null
+    /** Uptime da ESP no último STATUS — se diminuir, ela reiniciou. Só com firmware que o envia. */
+    private var espUptimeAnterior: Long? = null
+
+    init {
+        // Pilha Bluetooth do Android reiniciando (comum em MediaTek) derruba a
+        // conexão sem culpa da ESP — precisa aparecer separado no diagnóstico.
+        ContextCompat.registerReceiver(
+            context,
+            object : BroadcastReceiver() {
+                override fun onReceive(c: Context, intent: Intent) {
+                    when (intent.getIntExtra(BluetoothAdapter.EXTRA_STATE, -1)) {
+                        BluetoothAdapter.STATE_OFF -> diagnostico.log(
+                            Categoria.BLE, "BLUETOOTH_DESLIGADO", Severidade.ERRO, "O Bluetooth do aparelho foi desligado",
+                        )
+                        BluetoothAdapter.STATE_ON -> diagnostico.log(
+                            Categoria.BLE, "BLUETOOTH_LIGADO", Severidade.INFO, "O Bluetooth do aparelho foi ligado",
+                        )
+                    }
+                }
+            },
+            IntentFilter(BluetoothAdapter.ACTION_STATE_CHANGED),
+            ContextCompat.RECEIVER_NOT_EXPORTED,
+        )
+    }
+
     // ── GATT callback ─────────────────────────────────────────────────────
 
     private val gattCallback = object : BluetoothGattCallback() {
@@ -104,6 +150,7 @@ class BliqBleManager(private val context: Context) {
                     connectCont = null
                 }
                 BluetoothProfile.STATE_DISCONNECTED -> {
+                    ultimoGattStatus = status
                     if (connectCont != null) {
                         connectCont?.resumeWithException(Exception("Conexão falhou (status $status)"))
                         connectCont = null
@@ -113,7 +160,10 @@ class BliqBleManager(private val context: Context) {
                         writeCont = null
                         descriptorCont?.resumeWithException(Exception("BLE desconectado"))
                         descriptorCont = null
-                        handleUnexpectedDisconnect()
+                        handleUnexpectedDisconnect(
+                            "LINK_PERDIDO",
+                            mapOf("gattStatus" to status, "gattMotivo" to nomeGattStatus(status)),
+                        )
                     }
                 }
             }
@@ -199,6 +249,23 @@ class BliqBleManager(private val context: Context) {
     }
 
     suspend fun sendCommand(json: String) {
+        try {
+            escrever(json)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            val acao = Regex("\"action\"\\s*:\\s*\"(\\w+)\"").find(json)?.groupValues?.get(1) ?: "?"
+            diagnostico.log(
+                Categoria.BLE, "BLE_COMANDO_FALHOU", Severidade.AVISO,
+                "Comando $acao não chegou à ESP32: ${e.message}",
+                mapOf("acao" to acao, "erro" to e.message),
+                agruparPor = "$acao|${e.message}",
+            )
+            throw e
+        }
+    }
+
+    private suspend fun escrever(json: String) {
         val g    = gatt           ?: throw Exception("Nenhum dispositivo conectado.")
         val char = characteristic ?: throw Exception("Característica BLE não disponível.")
 
@@ -231,6 +298,10 @@ class BliqBleManager(private val context: Context) {
     }
 
     fun disconnect() {
+        if (autoReconnect) {
+            diagnostico.log(Categoria.BLE, "BLE_DESCONECTADO_PELO_APP", Severidade.INFO, "Conexão BLE encerrada pelo app")
+        }
+        conectadoDesde = null
         autoReconnect = false
         keepAliveJob?.cancel()
         keepAliveJob = null
@@ -268,10 +339,12 @@ class BliqBleManager(private val context: Context) {
                 val device: BluetoothDevice = when {
                     // On even retries after the first: try direct connect by address (faster)
                     lastAddress != null && retryAttempt > 0 && retryAttempt % 2 == 0 -> {
+                        etapa = "CONEXAO_DIRETA"
                         _status.value = ConnectionStatus.CONNECTING
                         getBluetoothAdapter().getRemoteDevice(lastAddress)
                     }
                     else -> {
+                        etapa = "SCAN"
                         _status.value = ConnectionStatus.SCANNING
                         val found = scanForDevice()
                         lastAddress = found.address
@@ -280,13 +353,17 @@ class BliqBleManager(private val context: Context) {
                     }
                 }
 
+                val viaScan = etapa == "SCAN"
                 doConnect(device)
                 _status.value = ConnectionStatus.CONNECTED
+                registrarConexao(viaScan)
                 retryAttempt = 0
                 startKeepAlive()
                 return  // Stay connected — gattCallback handles drops
             } catch (e: Exception) {
                 Log.e("BliqBLE", "Falha na conexão (tentativa $retryAttempt): ${e.message}")
+                // Cancelamento é o próprio app reiniciando o loop, não falha da ESP.
+                if (e !is CancellationException) registrarFalha(e)
                 closeGatt()
                 if (!autoReconnect) {
                     _status.value = ConnectionStatus.DISCONNECTED
@@ -301,9 +378,10 @@ class BliqBleManager(private val context: Context) {
         }
     }
 
-    private fun handleUnexpectedDisconnect() {
+    private fun handleUnexpectedDisconnect(motivo: String, dados: Map<String, Any?> = emptyMap()) {
         // Evita dupla chamada (gattCallback + keepAlive simultaneamente)
         if (_status.value == ConnectionStatus.RECONNECTING) return
+        registrarDesconexao(motivo, dados)
         keepAliveJob?.cancel()
         keepAliveJob = null
         // Atualiza o status ANTES de zerar o gatt — evita janela onde status=CONNECTED mas gatt=null
@@ -337,7 +415,7 @@ class BliqBleManager(private val context: Context) {
                     throw e
                 } catch (e: Exception) {
                     Log.w("BliqBLE", "Keep-alive: ESP não respondeu — ${e.message}")
-                    handleUnexpectedDisconnect()
+                    handleUnexpectedDisconnect("KEEPALIVE_SEM_RESPOSTA", mapOf("erro" to e.message))
                     break
                 }
             }
@@ -390,6 +468,7 @@ class BliqBleManager(private val context: Context) {
     }
 
     private suspend fun doConnect(device: BluetoothDevice) {
+        etapa = "CONEXAO"
         suspendCancellableCoroutine<Unit> { cont ->
             connectCont = cont
             cont.invokeOnCancellation { connectCont = null }
@@ -399,6 +478,7 @@ class BliqBleManager(private val context: Context) {
         // Limpa cache GATT do Android para forçar descoberta real via rádio BLE.
         // Sem isso, discoverServices() responde do cache e passa em conexões fantasmas.
         try { BluetoothGatt::class.java.getMethod("refresh").invoke(g) } catch (_: Exception) {}
+        etapa = "DISCOVERY"
         try {
             withTimeout(10_000L) {
                 suspendCancellableCoroutine<Unit> { cont ->
@@ -413,7 +493,9 @@ class BliqBleManager(private val context: Context) {
         } catch (_: TimeoutCancellationException) {
             throw Exception("ESP32 não respondeu ao discovery — possível conexão fantasma")
         }
+        etapa = "CARACTERISTICA"
         setupCharacteristic(g)
+        etapa = "VERIFICACAO"
         verifyLinkWithWrite()
     }
 
@@ -431,6 +513,7 @@ class BliqBleManager(private val context: Context) {
         if (received == null) {
             throw Exception("ESP32 não respondeu STATUS na aplicação — conexão fantasma/idle")
         }
+        observarStatusEsp(received)
     }
 
     private suspend fun setupCharacteristic(g: BluetoothGatt) {
@@ -459,6 +542,103 @@ class BliqBleManager(private val context: Context) {
                 g.writeDescriptor(descriptor)
             }
         }
+    }
+
+    // ── Diagnóstico ───────────────────────────────────────────────────────
+
+    private fun registrarConexao(viaScan: Boolean) {
+        val agora = SystemClock.elapsedRealtime()
+        val dados = mutableMapOf<String, Any?>(
+            "tentativas" to falhasSeguidas + 1,
+            "via" to if (viaScan) "SCAN" else "ENDERECO",
+            "dispositivo" to deviceName,
+            "ultimoErro" to ultimoErro,
+        )
+        foraDoArDesde?.let { dados["foraDoArSegundos"] = (agora - it) / 1000 }
+        diagnostico.log(
+            Categoria.BLE, "BLE_CONECTADO", Severidade.INFO,
+            if (foraDoArDesde != null) "ESP32 reconectada" else "ESP32 conectada",
+            dados,
+        )
+        falhasSeguidas = 0
+        ultimoErro = null
+        foraDoArDesde = null
+        conectadoDesde = agora
+    }
+
+    private fun registrarFalha(e: Exception) {
+        falhasSeguidas++
+        ultimoErro = e.message
+        if (foraDoArDesde == null) foraDoArDesde = SystemClock.elapsedRealtime()
+        // Detalhe nas primeiras tentativas; depois uma a cada 20 — com a ESP
+        // desligada por horas, cada tentativa viraria um evento.
+        if (falhasSeguidas <= 3 || falhasSeguidas % 20 == 0) {
+            val gattStatus = ultimoGattStatus
+            diagnostico.log(
+                Categoria.BLE, "BLE_FALHA_CONEXAO", Severidade.AVISO, e.message,
+                mapOf(
+                    "tentativa" to falhasSeguidas,
+                    "etapa" to etapa,
+                    "dispositivo" to deviceName,
+                    "gattStatus" to gattStatus,
+                    "gattMotivo" to gattStatus?.let(::nomeGattStatus),
+                    "foraDoArSegundos" to foraDoArDesde?.let { (SystemClock.elapsedRealtime() - it) / 1000 },
+                ),
+            )
+        }
+        ultimoGattStatus = null
+    }
+
+    private fun registrarDesconexao(motivo: String, dados: Map<String, Any?>) {
+        val agora = SystemClock.elapsedRealtime()
+        val conectadoSegundos = conectadoDesde?.let { (agora - it) / 1000 }
+        conectadoDesde = null
+        foraDoArDesde = agora
+        // Com cliente no box a queda tem impacto direto — é a que mais importa.
+        val emSessao = diagnostico.cicloId != null
+        diagnostico.log(
+            Categoria.BLE, "BLE_DESCONECTADO",
+            if (emSessao) Severidade.ERRO else Severidade.AVISO,
+            "Conexão com a ESP32 perdida ($motivo)",
+            mapOf("motivo" to motivo, "conectadoSegundos" to conectadoSegundos, "dispositivo" to deviceName) + dados,
+        )
+    }
+
+    /**
+     * Firmware que manda `uptime` (segundos) no STATUS permite saber se a ESP
+     * reiniciou — queda de energia, brownout ao acionar relé, watchdog. Os
+     * campos `reset` (motivo) e `heap` (memória livre) vão junto se existirem.
+     */
+    private fun observarStatusEsp(json: String) {
+        val obj = runCatching { JSONObject(json) }.getOrNull() ?: return
+        val uptime = obj.optLong("uptime", -1L)
+        if (uptime < 0) return
+        val anterior = espUptimeAnterior
+        if (anterior != null && uptime < anterior) {
+            diagnostico.log(
+                Categoria.BLE, "ESP_REINICIOU", Severidade.ERRO, "A ESP32 reiniciou",
+                mapOf(
+                    "uptimeAnteriorSegundos" to anterior,
+                    "uptimeSegundos" to uptime,
+                    "motivoReset" to obj.opt("reset")?.toString(),
+                    "memoriaLivre" to obj.opt("heap")?.toString(),
+                    "dispositivo" to deviceName,
+                ),
+            )
+        }
+        espUptimeAnterior = uptime
+    }
+
+    private fun nomeGattStatus(status: Int) = when (status) {
+        0    -> "SUCCESS"
+        8    -> "CONNECTION_TIMEOUT"          // a ESP sumiu do rádio: desligou, alcance, interferência
+        19   -> "REMOTE_USER_TERMINATED"      // a ESP encerrou a conexão
+        22   -> "LOCAL_HOST_TERMINATED"       // o próprio Android derrubou
+        34   -> "LMP_RESPONSE_TIMEOUT"
+        62   -> "CONNECTION_FAILED_ESTABLISHMENT"
+        133  -> "GATT_ERROR"                  // erro genérico da pilha BLE do Android
+        257  -> "GATT_FAILURE"
+        else -> "STATUS_$status"
     }
 
     private fun hasPermission(perm: String) =

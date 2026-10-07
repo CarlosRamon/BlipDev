@@ -327,6 +327,7 @@ fun NavGraph(navController: NavHostController, app: BliqTotemApp) {
                     clienteId         = route.clienteId,
                     crossSellMinutos  = route.crossSellMinutos,
                     crossSellPreco    = route.crossSellPreco,
+                    diagnostico       = app.diagnostico,
                 )
             )
             SessionScreen(

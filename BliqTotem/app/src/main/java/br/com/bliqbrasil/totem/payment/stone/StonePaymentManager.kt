@@ -6,6 +6,9 @@ import android.graphics.BitmapFactory
 import android.util.Log
 import br.com.bliqbrasil.totem.BuildConfig
 import br.com.bliqbrasil.totem.R
+import br.com.bliqbrasil.totem.diagnostics.Categoria
+import br.com.bliqbrasil.totem.diagnostics.DiagnosticLogger
+import br.com.bliqbrasil.totem.diagnostics.Severidade
 import br.com.stone.posandroid.providers.PosPrintReceiptProvider
 import br.com.stone.posandroid.providers.PosTransactionProvider
 import kotlinx.coroutines.CoroutineScope
@@ -30,9 +33,16 @@ import stone.utils.Stone
 import java.util.UUID
 import kotlin.concurrent.thread
 
-class StonePaymentManager {
+class StonePaymentManager(private val diagnostico: DiagnosticLogger) {
 
     private val TAG = "StonePaymentManager"
+
+    private val RECUSAS_NORMAIS = setOf(
+        TransactionStatusEnum.DECLINED,
+        TransactionStatusEnum.DECLINED_BY_CARD,
+        TransactionStatusEnum.CANCELLED,
+        TransactionStatusEnum.REJECTED,
+    )
 
     private val _state = MutableStateFlow<PaymentState>(PaymentState.Idle)
     val state: StateFlow<PaymentState> = _state.asStateFlow()
@@ -67,6 +77,7 @@ class StonePaymentManager {
 
                 override fun onError() {
                     Log.e(TAG, "Erro ao ativar Stone code: $stoneCode")
+                    diagnostico.log(Categoria.PAGAMENTO, "STONE_ATIVACAO_FALHOU", Severidade.ERRO, "Falha ao ativar o Stone code")
                     onResult(Result.failure(Exception("Falha na ativação do Stone code")))
                 }
 
@@ -187,6 +198,14 @@ class StonePaymentManager {
                 val status = provider.transactionStatus
                 val errors = runCatching { provider.listOfErrors }.getOrNull()
                 Log.e(TAG, "onError — status=$status acquirerKey=${txn.acquirerTransactionKey} errors=$errors")
+                // Cartão recusado ou cancelado pelo cliente é o fluxo normal, não problema.
+                if (status !in RECUSAS_NORMAIS) {
+                    diagnostico.log(
+                        Categoria.PAGAMENTO, "PAGAMENTO_ERRO_TECNICO", Severidade.ERRO,
+                        "Transação com erro técnico (status=$status)",
+                        mapOf("status" to status?.name, "erros" to errors?.toString()),
+                    )
+                }
                 if (status == TransactionStatusEnum.PENDING) {
                     thread(name = "StoneReversal") { runReversal(activity) }
                 }

@@ -1,6 +1,8 @@
 package br.com.bliqbrasil.totem.data.network
 
 import br.com.bliqbrasil.totem.data.local.TokenStorage
+import br.com.bliqbrasil.totem.diagnostics.DiagnosticInterceptor
+import br.com.bliqbrasil.totem.diagnostics.DiagnosticLogger
 import com.google.gson.Gson
 import com.google.gson.JsonObject
 import okhttp3.OkHttpClient
@@ -12,11 +14,12 @@ import java.util.concurrent.TimeUnit
 
 private const val BASE_URL = "https://app.bliqbrasil.com.br"
 
-class NetworkClient(tokenStorage: TokenStorage) {
+class NetworkClient(tokenStorage: TokenStorage, diagnostico: () -> DiagnosticLogger) {
 
     val authInterceptor = AuthInterceptor(tokenStorage)
 
     private val okhttp = OkHttpClient.Builder()
+        .addInterceptor(DiagnosticInterceptor(diagnostico))
         .addInterceptor(authInterceptor)
         .addInterceptor(HttpLoggingInterceptor().apply {
             level = HttpLoggingInterceptor.Level.BODY

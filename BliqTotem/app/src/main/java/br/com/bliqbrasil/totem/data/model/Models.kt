@@ -144,6 +144,12 @@ data class CriarClienteRequest(
 
 data class AdicionarExtraRequest(val produtoExtraId: String)
 
+/** Lote do diagnóstico — ver DiagnosticLogger. Eventos já vêm serializados da fila. */
+data class DiagnosticoLote(
+    val enviadoEm: String,
+    val eventos: List<com.google.gson.JsonObject>,
+)
+
 data class TelemetriaRequest(
     val evento: String,
     val dados: Map<String, Any?>? = null,

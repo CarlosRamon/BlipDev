@@ -1,21 +1,16 @@
 package br.com.bliqbrasil.totem.ui.screens.home
 
 import android.app.Application
-import android.content.Context
-import android.net.ConnectivityManager
-import android.net.NetworkCapabilities
-import android.net.wifi.WifiManager
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
-import br.com.bliqbrasil.totem.BuildConfig
+import br.com.bliqbrasil.totem.BliqTotemApp
 import br.com.bliqbrasil.totem.bluetooth.BliqBleManager
 import br.com.bliqbrasil.totem.data.local.TokenStorage
 import br.com.bliqbrasil.totem.data.model.PosConfig
 import br.com.bliqbrasil.totem.data.model.WashOption
 import br.com.bliqbrasil.totem.data.model.WashOptionExtra
 import br.com.bliqbrasil.totem.data.repository.PosRepository
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -127,15 +122,12 @@ class HomeViewModel(
         }
     }
 
+    // O heartbeat roda no escopo do app (HeartbeatLoop); a Home só usa a
+    // resposta para retomar uma sessão que o servidor diz estar ativa.
     private fun startHeartbeat() {
         viewModelScope.launch {
-            while (true) {
-                delay(30_000)
-                if (tokenStorage.getToken() == null) continue
-                val bleStatus = bleManager.status.value.name
-                val (networkType, signalStrength) = getNetworkInfo()
-                val result = repository.heartbeat(bleStatus, networkType, signalStrength, BuildConfig.VERSION_NAME)
-                result.getOrNull()?.ciclo?.let { ciclo ->
+            getApplication<BliqTotemApp>().heartbeat.respostas.collect { resposta ->
+                resposta.ciclo?.let { ciclo ->
                     if (ciclo.segundosRestantes > 0 && _state.value.activeSession == null && !_state.value.loading) {
                         _state.update { s ->
                             s.copy(
@@ -150,23 +142,6 @@ class HomeViewModel(
                     }
                 }
             }
-        }
-    }
-
-    private fun getNetworkInfo(): Pair<String, Int?> {
-        val ctx = getApplication<Application>()
-        val cm = ctx.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
-        val network = cm.activeNetwork ?: return Pair("NONE", null)
-        val caps = cm.getNetworkCapabilities(network) ?: return Pair("NONE", null)
-        return when {
-            caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) -> {
-                @Suppress("DEPRECATION")
-                val rssi = (ctx.getSystemService(Context.WIFI_SERVICE) as WifiManager).connectionInfo.rssi
-                Pair("WIFI", rssi)
-            }
-            caps.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) -> Pair("MOBILE", null)
-            caps.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET) -> Pair("ETHERNET", null)
-            else -> Pair("NONE", null)
         }
     }
 
