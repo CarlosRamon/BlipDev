@@ -1,7 +1,7 @@
 <title>API Bliq para Franqueados</title>
 <meta name="claude:viewport-fit-sides" content="cover">
-<meta name="doc-version" content="1.0">
-<meta name="doc-date" content="2026-10-17">
+<meta name="doc-version" content="1.1">
+<meta name="doc-date" content="2026-10-22">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fugaz+One&family=Epilogue:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
@@ -153,7 +153,7 @@
   .print-only { display: none; }
 
   /* ── Impressão / PDF ─────────────────────────────────────────────── */
-  @page { size: A4; margin: 18mm 16mm 20mm; @bottom-left { content: "API Bliq para franqueados · Documento v1.0 · 17/10/2026"; font: 8pt "Epilogue", sans-serif; color: #5A6B7B; } @bottom-right { content: counter(page) " / " counter(pages); font: 8pt "Epilogue", sans-serif; color: #5A6B7B; } }
+  @page { size: A4; margin: 18mm 16mm 20mm; @bottom-left { content: "API Bliq para franqueados · Documento v1.1 · 22/10/2026"; font: 8pt "Epilogue", sans-serif; color: #5A6B7B; } @bottom-right { content: counter(page) " / " counter(pages); font: 8pt "Epilogue", sans-serif; color: #5A6B7B; } }
   @page :first { margin: 0; @bottom-left { content: none; } @bottom-right { content: none; } }
   @media print {
     :root { color-scheme: light; }
@@ -165,7 +165,7 @@
     main { display: block; }
     main > section { margin-bottom: 26pt; }
     section { gap: 10pt; }
-    #autenticacao, #regras, #resumo, #serie, #vendas, #franquia, #exemplos, #erros { break-before: page; }
+    #autenticacao, #regras, #resumo, #serie, #vendas, #franquia, #exemplos, #erros, #versoes { break-before: page; }
     h2 { font-size: 18pt; break-after: avoid; }
     h3 { break-after: avoid; }
     .endpoint-head { break-after: avoid; }
@@ -200,8 +200,8 @@
   <h1>API de faturamento para franqueados</h1>
   <p class="lead">Referência da API de consulta: autenticação por chave, endpoints, regras de cálculo e exemplos de integração.</p>
   <dl>
-    <dt>Versão do documento</dt><dd class="versao">1.0</dd>
-    <dt>Data</dt><dd>17 de outubro de 2026</dd>
+    <dt>Versão do documento</dt><dd class="versao">1.1</dd>
+    <dt>Data</dt><dd>22 de outubro de 2026</dd>
     <dt>Versão da API</dt><dd>v1 · somente leitura</dd>
     <dt>URL base</dt><dd><code>https://app.bliqbrasil.com.br/api/v1</code></dd>
     <dt>Gestão das chaves</dt><dd><code>https://app.bliqbrasil.com.br/franqueado/api</code></dd>
@@ -236,6 +236,7 @@
     <span class="group">Uso</span>
     <a href="#exemplos">Exemplos de código</a>
     <a href="#erros">Erros</a>
+    <a href="#versoes">Histórico de versões</a>
   </nav>
 
   <main>
@@ -289,7 +290,13 @@
       <p>Valores em reais, como número com até duas casas decimais (<code>1234.5</code> = R$ 1.234,50). O ticket médio é receita dividida pelo número de vendas.</p>
 
       <h3>Dados de clientes</h3>
-      <p>Por causa da LGPD, a API não devolve CPF, nome, telefone ou e-mail de clientes. Cada venda informa só se o cliente se identificou (<code>clienteIdentificado</code>).</p>
+      <p>Por causa da LGPD, a API não devolve CPF, nome, telefone ou e-mail de clientes. Quando o cliente se identifica com CPF no totem, a venda traz um código anônimo dele em <code>clienteId</code>, para você acompanhar recorrência sem receber dado pessoal.</p>
+      <ul>
+        <li>O código é fixo: a mesma pessoa tem sempre o mesmo <code>clienteId</code> na sua unidade, inclusive nas vendas antigas.</li>
+        <li>Cada unidade tem códigos próprios. A mesma pessoa aparece com códigos diferentes em unidades diferentes.</li>
+        <li>O código não permite chegar ao CPF nem a qualquer outro dado da pessoa.</li>
+        <li>Venda sem identificação vem com <code>clienteId: null</code> e <code>clienteIdentificado: false</code>. O código depende do CPF digitado no totem; o pagamento sozinho (PIX ou cartão) não identifica o cliente.</li>
+      </ul>
     </section>
 
     <section id="resumo">
@@ -403,6 +410,7 @@
       <span class="k">"minutosUtilizados"</span>: 20,
       <span class="k">"extras"</span>: [ { <span class="k">"rotulo"</span>: <span class="s">"+5 min"</span>, <span class="k">"minutos"</span>: 5, <span class="k">"valor"</span>: 10 } ],
       <span class="k">"crossSell"</span>: false,
+      <span class="k">"clienteId"</span>: <span class="s">"cli_Q2x7mR0aVt9KfP3c"</span>,
       <span class="k">"clienteIdentificado"</span>: true
     }
   ]
@@ -410,6 +418,7 @@
       <ul>
         <li><code>valor</code> é o total cobrado, extras incluídos.</li>
         <li><code>produto</code> pode vir <code>null</code> em ciclos antigos sem produto vinculado.</li>
+        <li><code>clienteId</code> é o código anônimo do cliente que se identificou com CPF, ou <code>null</code>. Use para contar quantas vezes a mesma pessoa volta, em que dias e horários vem e quem parou de vir. Veja <a href="#regras">Dados de clientes</a>.</li>
         <li>Para baixar tudo, repita a chamada com <code>pagina</code> de 1 até <code>totalPaginas</code>.</li>
       </ul>
     </section>
@@ -528,7 +537,18 @@ vendas, pagina = [], 1
       <p>Toda resposta traz <code>x-ratelimit-limit</code> e <code>x-ratelimit-remaining</code> para você acompanhar o consumo do minuto.</p>
     </section>
 
-    <footer>Documento v1.0 · 17/10/2026 · API Bliq v1 · Somente leitura. Mudanças que quebrem compatibilidade sairão numa nova versão (<code>/api/v2</code>), com aviso prévio.</footer>
+    <section id="versoes">
+      <h2>Histórico de versões</h2>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Documento</th><th>Data</th><th>Mudanças</th></tr></thead>
+        <tbody>
+          <tr><td>1.1</td><td class="num">22/10/2026</td><td>Novo campo <code>clienteId</code> em <code>GET /vendas</code>: código anônimo e fixo do cliente identificado por CPF, também nas vendas antigas. Mudança compatível: nenhum campo existente mudou.</td></tr>
+          <tr><td>1.0</td><td class="num">17/10/2026</td><td>Primeira versão: resumo, série, vendas e dados da franquia.</td></tr>
+        </tbody>
+      </table></div>
+    </section>
+
+    <footer>Documento v1.1 · 22/10/2026 · API Bliq v1 · Somente leitura. Mudanças que quebrem compatibilidade sairão numa nova versão (<code>/api/v2</code>), com aviso prévio.</footer>
   </main>
 </div>
 
