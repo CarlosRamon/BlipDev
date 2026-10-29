@@ -1,7 +1,7 @@
 <title>API Bliq para Franqueados</title>
 <meta name="claude:viewport-fit-sides" content="cover">
-<meta name="doc-version" content="1.1">
-<meta name="doc-date" content="2026-10-22">
+<meta name="doc-version" content="1.2">
+<meta name="doc-date" content="2026-10-28">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fugaz+One&family=Epilogue:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
@@ -153,7 +153,7 @@
   .print-only { display: none; }
 
   /* ── Impressão / PDF ─────────────────────────────────────────────── */
-  @page { size: A4; margin: 18mm 16mm 20mm; @bottom-left { content: "API Bliq para franqueados · Documento v1.1 · 22/10/2026"; font: 8pt "Epilogue", sans-serif; color: #5A6B7B; } @bottom-right { content: counter(page) " / " counter(pages); font: 8pt "Epilogue", sans-serif; color: #5A6B7B; } }
+  @page { size: A4; margin: 18mm 16mm 20mm; @bottom-left { content: "API Bliq para franqueados · Documento v1.2 · 28/10/2026"; font: 8pt "Epilogue", sans-serif; color: #5A6B7B; } @bottom-right { content: counter(page) " / " counter(pages); font: 8pt "Epilogue", sans-serif; color: #5A6B7B; } }
   @page :first { margin: 0; @bottom-left { content: none; } @bottom-right { content: none; } }
   @media print {
     :root { color-scheme: light; }
@@ -200,8 +200,8 @@
   <h1>API de faturamento para franqueados</h1>
   <p class="lead">Referência da API de consulta: autenticação por chave, endpoints, regras de cálculo e exemplos de integração.</p>
   <dl>
-    <dt>Versão do documento</dt><dd class="versao">1.1</dd>
-    <dt>Data</dt><dd>22 de outubro de 2026</dd>
+    <dt>Versão do documento</dt><dd class="versao">1.2</dd>
+    <dt>Data</dt><dd>28 de outubro de 2026</dd>
     <dt>Versão da API</dt><dd>v1 · somente leitura</dd>
     <dt>URL base</dt><dd><code>https://app.bliqbrasil.com.br/api/v1</code></dd>
     <dt>Gestão das chaves</dt><dd><code>https://app.bliqbrasil.com.br/franqueado/api</code></dd>
@@ -276,6 +276,7 @@
 
       <h3>O que conta como venda</h3>
       <p>Mesmo critério da receita do Relatório do painel: ciclo <strong>finalizado</strong>, com pagamento <strong>aprovado</strong> e valor maior que zero. Ciclos manuais de brinde e manutenção não são venda; aparecem só como contagem em <code>cortesias</code>. Uma venda entra na API quando o ciclo termina, não quando o cliente paga.</p>
+      <p>Com cupom de desconto, a venda conta pelo valor <strong>cobrado</strong>, já com o desconto. Uma compra zerada por cupom de 100% não passou pela maquininha: não é venda e aparece só como contagem em <code>cupons.ciclosSemCobranca</code>.</p>
 
       <h3>Datas e fuso horário</h3>
       <ul>
@@ -333,6 +334,7 @@
   ],
   <span class="k">"upsell"</span>: { <span class="k">"vendasComExtras"</span>: 96, <span class="k">"receitaExtras"</span>: 960 },
   <span class="k">"crossSell"</span>: { <span class="k">"vendas"</span>: 41, <span class="k">"receita"</span>: 410 },
+  <span class="k">"cupons"</span>: { <span class="k">"vendas"</span>: 58, <span class="k">"desconto"</span>: 162.4, <span class="k">"ciclosSemCobranca"</span>: 3, <span class="k">"descontoTotal"</span>: 222.4 },
   <span class="k">"cortesias"</span>: { <span class="k">"ciclos"</span>: 12 }
 }</pre></div>
       <div class="table-wrap"><table>
@@ -343,6 +345,10 @@
           <tr><td><code>porBox[].minutosUtilizados</code></td><td>Minutos de uso efetivo do box nas vendas do período.</td></tr>
           <tr><td><code>upsell</code></td><td>Vendas em que o cliente adicionou minutos extras ao pacote. <code>receitaExtras</code> já está dentro de <code>receita</code>; não some de novo.</td></tr>
           <tr><td><code>crossSell</code></td><td>Vendas que nasceram da oferta de minutos no fim de um ciclo. Também já estão em <code>receita</code>.</td></tr>
+          <tr><td><code>cupons.vendas</code></td><td>Vendas em que o cliente usou cupom de desconto. Já estão em <code>vendas</code> e <code>receita</code>, pelo valor cobrado.</td></tr>
+          <tr><td><code>cupons.desconto</code></td><td>Desconto dado nessas vendas, em reais. Já está fora de <code>receita</code>; não subtraia de novo.</td></tr>
+          <tr><td><code>cupons.ciclosSemCobranca</code></td><td>Ciclos pagos 100% com cupom (valor zero, sem passar pela maquininha). Não são venda.</td></tr>
+          <tr><td><code>cupons.descontoTotal</code></td><td>Desconto das vendas mais o dos ciclos sem cobrança. É o mesmo número do card "Descontos em cupons" do Relatório do painel.</td></tr>
           <tr><td><code>cortesias.ciclos</code></td><td>Ciclos liberados manualmente como brinde ou manutenção (sem receita).</td></tr>
         </tbody>
       </table></div>
@@ -405,7 +411,10 @@
       <span class="k">"box"</span>: { <span class="k">"id"</span>: <span class="s">"8f0c…"</span>, <span class="k">"nome"</span>: <span class="s">"Box 1"</span>, <span class="k">"tipo"</span>: <span class="s">"LAVACAO"</span> },
       <span class="k">"produto"</span>: { <span class="k">"id"</span>: <span class="s">"c21a…"</span>, <span class="k">"nome"</span>: <span class="s">"Lavagem completa 20 min"</span>, <span class="k">"tipo"</span>: <span class="s">"TEMPO_FIXO"</span> },
       <span class="k">"metodoPagamento"</span>: <span class="s">"PIX"</span>,
-      <span class="k">"valor"</span>: 40,
+      <span class="k">"valor"</span>: 36,
+      <span class="k">"valorBruto"</span>: 40,
+      <span class="k">"desconto"</span>: 4,
+      <span class="k">"cupom"</span>: { <span class="k">"codigo"</span>: <span class="s">"BEMVINDO10"</span> },
       <span class="k">"minutosContratados"</span>: 25,
       <span class="k">"minutosUtilizados"</span>: 20,
       <span class="k">"extras"</span>: [ { <span class="k">"rotulo"</span>: <span class="s">"+5 min"</span>, <span class="k">"minutos"</span>: 5, <span class="k">"valor"</span>: 10 } ],
@@ -416,7 +425,9 @@
   ]
 }</pre></div>
       <ul>
-        <li><code>valor</code> é o total cobrado, extras incluídos.</li>
+        <li><code>valor</code> é o total cobrado, extras incluídos e desconto já abatido. É o que bate com o extrato da maquininha.</li>
+        <li><code>valorBruto</code> é o valor de tabela (pacote mais extras) e <code>desconto</code> a diferença para <code>valor</code>. Sem cupom, <code>valorBruto</code> é igual a <code>valor</code>, <code>desconto</code> é <code>0</code> e <code>cupom</code> vem <code>null</code>.</li>
+        <li><code>cupom.codigo</code> é o código usado no totem, como cadastrado no painel em Cupons.</li>
         <li><code>produto</code> pode vir <code>null</code> em ciclos antigos sem produto vinculado.</li>
         <li><code>clienteId</code> é o código anônimo do cliente que se identificou com CPF, ou <code>null</code>. Use para contar quantas vezes a mesma pessoa volta, em que dias e horários vem e quem parou de vir. Veja <a href="#regras">Dados de clientes</a>.</li>
         <li>Para baixar tudo, repita a chamada com <code>pagina</code> de 1 até <code>totalPaginas</code>.</li>
@@ -542,13 +553,14 @@ vendas, pagina = [], 1
       <div class="table-wrap"><table>
         <thead><tr><th>Documento</th><th>Data</th><th>Mudanças</th></tr></thead>
         <tbody>
+          <tr><td>1.2</td><td class="num">28/10/2026</td><td>Cupons de desconto. Em <code>GET /vendas</code>, novos campos <code>valorBruto</code>, <code>desconto</code> e <code>cupom</code>; em <code>GET /faturamento/resumo</code>, novo bloco <code>cupons</code>. <code>valor</code> e <code>receita</code> continuam sendo o valor cobrado. Mudança compatível: nenhum campo existente mudou.</td></tr>
           <tr><td>1.1</td><td class="num">22/10/2026</td><td>Novo campo <code>clienteId</code> em <code>GET /vendas</code>: código anônimo e fixo do cliente identificado por CPF, também nas vendas antigas. Mudança compatível: nenhum campo existente mudou.</td></tr>
           <tr><td>1.0</td><td class="num">17/10/2026</td><td>Primeira versão: resumo, série, vendas e dados da franquia.</td></tr>
         </tbody>
       </table></div>
     </section>
 
-    <footer>Documento v1.1 · 22/10/2026 · API Bliq v1 · Somente leitura. Mudanças que quebrem compatibilidade sairão numa nova versão (<code>/api/v2</code>), com aviso prévio.</footer>
+    <footer>Documento v1.2 · 28/10/2026 · API Bliq v1 · Somente leitura. Mudanças que quebrem compatibilidade sairão numa nova versão (<code>/api/v2</code>), com aviso prévio.</footer>
   </main>
 </div>
 
