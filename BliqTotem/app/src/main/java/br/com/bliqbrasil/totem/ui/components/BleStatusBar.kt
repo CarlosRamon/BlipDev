@@ -2,6 +2,7 @@ package br.com.bliqbrasil.totem.ui.components
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -9,6 +10,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -100,5 +102,46 @@ fun BleStatusBar(
                 }
             }
         }
+    }
+}
+
+/**
+ * Versão discreta do status do CLP para a barra superior: só o ponto e o
+ * rótulo, na cor do texto da barra. Em falha, tocar força a reconexão.
+ */
+@Composable
+fun BleStatusIndicator(
+    status: ConnectionStatus,
+    onForceRetry: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val config = configFor(status)
+    val palette = LocalBoxPalette.current
+
+    Row(
+        modifier = modifier
+            .clip(RoundedCornerShape(16.dp))
+            .clickable(enabled = config.showRetry, onClick = onForceRetry)
+            .padding(horizontal = 12.dp, vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        if (config.showSpinner) {
+            CircularProgressIndicator(
+                modifier = Modifier.size(10.dp),
+                strokeWidth = 1.5.dp,
+                color = config.dotColor,
+            )
+        } else {
+            Box(modifier = Modifier.size(8.dp).background(config.dotColor, CircleShape))
+        }
+
+        Spacer(Modifier.width(8.dp))
+
+        Text(
+            text = if (config.showRetry) "${config.label} · tocar para tentar" else config.label,
+            fontFamily = Epilogue,
+            fontSize = 13.sp,
+            color = palette.onContrast.copy(alpha = 0.85f),
+        )
     }
 }

@@ -27,7 +27,7 @@ import br.com.bliqbrasil.totem.BuildConfig
 import br.com.bliqbrasil.totem.R
 import br.com.bliqbrasil.totem.data.model.WashOption
 import br.com.bliqbrasil.totem.data.model.WashOptionExtra
-import br.com.bliqbrasil.totem.ui.components.BleStatusBar
+import br.com.bliqbrasil.totem.ui.components.BleStatusIndicator
 import br.com.bliqbrasil.totem.ui.theme.*
 import br.com.bliqbrasil.totem.util.formatCurrency
 
@@ -45,7 +45,6 @@ fun HomeScreen(
 ) {
     val state     by viewModel.state.collectAsStateWithLifecycle()
     val bleStatus by viewModel.bleManager.status.collectAsStateWithLifecycle()
-    val bleError  by viewModel.bleManager.errorMessage.collectAsStateWithLifecycle()
     val palette = LocalBoxPalette.current
     val bleManager = viewModel.bleManager
 
@@ -106,6 +105,13 @@ fun HomeScreen(
         topBar = {
             TopAppBar(
                 title = {},
+                navigationIcon = {
+                    BleStatusIndicator(
+                        status = bleStatus,
+                        onForceRetry = { bleManager.startAutoConnect(force = true) },
+                        modifier = Modifier.padding(start = 4.dp),
+                    )
+                },
                 actions = {
                     TextButton(onClick = onNavigateToSupport) {
                         Text("Ajuda", fontFamily = Epilogue, color = palette.onContrast, fontSize = 16.sp)
@@ -174,14 +180,6 @@ fun HomeScreen(
                     }
                     Spacer(Modifier.height(8.dp))
                 }
-            }
-
-            item {
-                BleStatusBar(
-                    status = bleStatus,
-                    errorMessage = bleError,
-                    onForceRetry = { bleManager.startAutoConnect(force = true) },
-                )
             }
 
             if (!BuildConfig.STONE_ENABLED) {
