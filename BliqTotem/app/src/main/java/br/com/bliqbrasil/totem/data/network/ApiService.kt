@@ -30,6 +30,15 @@ interface ApiService {
     @PATCH("/api/pos/ciclos/{cicloId}/finalizar")
     suspend fun finalizarCiclo(@Path("cicloId") cicloId: String): Ciclo
 
+    @GET("/api/pos/cupons")
+    suspend fun listarCupons(
+        @Query("clienteId") clienteId: String?,
+        @Query("valorBruto") valorBruto: Double,
+    ): List<CupomDisponivel>
+
+    @POST("/api/pos/cupons/validar")
+    suspend fun validarCupom(@Body request: ValidarCupomRequest): ValidarCupomResponse
+
     @GET("/api/pos/termos/atual")
     suspend fun getTermosAtual(): TermosAtual
 

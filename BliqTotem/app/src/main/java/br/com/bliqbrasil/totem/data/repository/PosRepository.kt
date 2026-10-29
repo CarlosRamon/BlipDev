@@ -54,9 +54,17 @@ class PosRepository(private val api: ApiService) {
         transacaoId: String?,
         clienteId: String? = null,
         crossSell: Boolean = false,
+        cupomCodigo: String? = null,
+        valorBruto: Double? = null,
     ): Result<Ciclo> = try {
         Result.success(
-            api.criarCiclo(CriarCicloRequest(produtoId, tempoContratado, metodoPagamento, valor, transacaoId, clienteId, crossSell))
+            api.criarCiclo(
+                CriarCicloRequest(
+                    produtoId, tempoContratado, metodoPagamento, valor, transacaoId, clienteId, crossSell,
+                    cupomCodigo = cupomCodigo,
+                    valorBruto  = valorBruto,
+                )
+            )
         )
     } catch (e: HttpException) {
         if (e.code() == 409) {
@@ -72,6 +80,12 @@ class PosRepository(private val api: ApiService) {
     } catch (e: Exception) {
         Result.failure(e)
     }
+
+    suspend fun listarCupons(clienteId: String?, valorBruto: Double): Result<List<CupomDisponivel>> =
+        safeApiCall { api.listarCupons(clienteId, valorBruto) }
+
+    suspend fun validarCupom(codigo: String, valorBruto: Double, clienteId: String?): Result<ValidarCupomResponse> =
+        safeApiCall { api.validarCupom(ValidarCupomRequest(codigo, valorBruto, clienteId)) }
 
     suspend fun adicionarExtra(cicloId: String, produtoExtraId: String): Result<Ciclo> =
         safeApiCall { api.adicionarExtra(cicloId, AdicionarExtraRequest(produtoExtraId)) }

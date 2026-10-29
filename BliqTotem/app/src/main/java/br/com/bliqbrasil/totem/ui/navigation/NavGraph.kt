@@ -2,6 +2,9 @@ package br.com.bliqbrasil.totem.ui.navigation
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
@@ -18,6 +21,8 @@ import br.com.bliqbrasil.totem.ui.screens.checkout.CheckoutViewModel
 import br.com.bliqbrasil.totem.data.model.PoliticaCpf
 import br.com.bliqbrasil.totem.ui.screens.cpfinput.CpfInputScreen
 import br.com.bliqbrasil.totem.ui.screens.cpfinput.CpfInputViewModel
+import br.com.bliqbrasil.totem.ui.screens.cupons.CuponsScreen
+import br.com.bliqbrasil.totem.ui.screens.cupons.CuponsViewModel
 import br.com.bliqbrasil.totem.ui.screens.extras.ExtrasScreen
 import br.com.bliqbrasil.totem.ui.screens.home.HomeScreen
 import br.com.bliqbrasil.totem.ui.screens.home.HomeViewModel
@@ -30,6 +35,9 @@ import br.com.bliqbrasil.totem.ui.screens.success.SuccessScreen
 import br.com.bliqbrasil.totem.ui.screens.success.SuccessViewModel
 import br.com.bliqbrasil.totem.ui.screens.welcome.WelcomeScreen
 import br.com.bliqbrasil.totem.ui.screens.welcome.WelcomeViewModel
+
+/** Chave do savedStateHandle do Checkout para o cupom escolhido na lista. */
+private const val CUPOM_ESCOLHIDO = "cupomEscolhido"
 
 @Composable
 fun NavGraph(navController: NavHostController, app: BliqTotemApp) {
@@ -200,12 +208,25 @@ fun NavGraph(navController: NavHostController, app: BliqTotemApp) {
             val selectedExtras = route.selectedExtrasJson.toWashOptionExtras()
             val vm = viewModel<CheckoutViewModel>(
                 factory = CheckoutViewModel.factory(
+                    repository     = app.repository,
                     washOption     = washOption,
                     selectedExtras = selectedExtras,
                     totalMinutes   = route.totalMinutes,
                     totalPrice     = route.totalPrice,
+                    clienteId      = route.clienteId,
+                    crossSell      = route.crossSell,
                 )
             )
+            // Cupom escolhido na lista: aplica revalidando no backend.
+            val cupomEscolhido by entry.savedStateHandle
+                .getStateFlow<String?>(CUPOM_ESCOLHIDO, null)
+                .collectAsState()
+            LaunchedEffect(cupomEscolhido) {
+                cupomEscolhido?.let {
+                    entry.savedStateHandle[CUPOM_ESCOLHIDO] = null
+                    vm.aplicarCupom(it)
+                }
+            }
             // Vindo da oferta do fim da sessão, o Checkout é a única tela na
             // pilha (a navegação limpou tudo): voltar leva à tela inicial.
             val goBack: () -> Unit = {
@@ -221,20 +242,40 @@ fun NavGraph(navController: NavHostController, app: BliqTotemApp) {
             CheckoutScreen(
                 viewModel = vm,
                 onBack = goBack,
-                onConfirm = { method ->
+                onConfirm = { method, cupom ->
                     navController.navigate(
                         AppDestinations.Payment(
                             washOptionJson     = washOption.toJson(),
                             selectedExtrasJson = selectedExtras.toJson(),
                             totalMinutes       = route.totalMinutes,
-                            totalPrice         = route.totalPrice,
+                            totalPrice         = cupom?.valorFinal ?: route.totalPrice,
                             paymentMethod      = method.toNavString(),
                             boxTipo            = route.boxTipo,
                             clienteId          = route.clienteId,
                             crossSell          = route.crossSell,
+                            cupomCodigo        = cupom?.codigo,
+                            valorBruto         = cupom?.let { route.totalPrice },
                         )
                     )
-                }
+                },
+                onVerCupons = {
+                    navController.navigate(AppDestinations.Cupons(route.clienteId, route.totalPrice))
+                },
+            )
+        }
+
+        composable<AppDestinations.Cupons> { entry ->
+            val route = entry.toRoute<AppDestinations.Cupons>()
+            val vm = viewModel<CuponsViewModel>(
+                factory = CuponsViewModel.factory(app.repository, route.clienteId, route.valorBruto)
+            )
+            CuponsScreen(
+                viewModel = vm,
+                onBack = { navController.popBackStack() },
+                onEscolher = { codigo ->
+                    navController.previousBackStackEntry?.savedStateHandle?.set(CUPOM_ESCOLHIDO, codigo)
+                    navController.popBackStack()
+                },
             )
         }
 
@@ -251,6 +292,8 @@ fun NavGraph(navController: NavHostController, app: BliqTotemApp) {
                     paymentMethod  = route.paymentMethod.toPaymentMethod(),
                     clienteId      = route.clienteId,
                     crossSell      = route.crossSell,
+                    cupomCodigo    = route.cupomCodigo,
+                    valorBruto     = route.valorBruto,
                 )
             )
             PaymentScreen(

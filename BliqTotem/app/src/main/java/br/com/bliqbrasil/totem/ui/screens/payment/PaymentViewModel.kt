@@ -31,6 +31,8 @@ class PaymentViewModel(
     val paymentMethod: PaymentMethod,
     private val clienteId: String = "",
     private val crossSell: Boolean = false,
+    private val cupomCodigo: String? = null,
+    private val valorBruto: Double? = null,
 ) : ViewModel() {
 
     data class UiState(
@@ -39,6 +41,9 @@ class PaymentViewModel(
         val cicloId: String? = null,
         val acquirerKey: String? = null,
         val navigateBack: Boolean = false,
+        // Compra zerada por cupom: o backend recusou (cupom deixou de valer ou
+        // não cobre mais o total). Nada foi cobrado, então dá para voltar.
+        val erroSemCobranca: String? = null,
     )
 
     private val _uiState = MutableStateFlow(UiState())
@@ -74,12 +79,14 @@ class PaymentViewModel(
         paymentStarted = true
         stone.resetState()
 
-        val amountCents = (totalPrice * 100).toLong()
         val type = when (paymentMethod) {
             PaymentMethod.CREDIT -> TransactionType.CREDIT
             PaymentMethod.DEBIT  -> TransactionType.DEBIT
             PaymentMethod.PIX    -> TransactionType.PIX
+            PaymentMethod.CUPOM  -> { criarCicloSemCobranca(); return }
         }
+        // round: 17.99 * 100 dá 1798.999…, e o toLong() cobraria um centavo a menos.
+        val amountCents = Math.round(totalPrice * 100)
         val orderId = UUID.randomUUID().toString().replace("-", "").take(20)
         stone.startPayment(activity, amountCents, type, orderId)
 
@@ -94,8 +101,36 @@ class PaymentViewModel(
 
     fun retry(activity: Activity) {
         paymentStarted = false
-        _uiState.update { it.copy(navigateBack = false) }
+        _uiState.update { it.copy(navigateBack = false, erroSemCobranca = null) }
         start(activity)
+    }
+
+    /** Cupom de 100%: não passa pela Stone; o backend revalida o cupom e cria o ciclo. */
+    private fun criarCicloSemCobranca() {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isCreatingCiclo = true, erroSemCobranca = null) }
+            val result = repository.criarCiclo(
+                produtoId       = washOption.id,
+                tempoContratado = totalMinutes,
+                metodoPagamento = "CUPOM",
+                valor           = 0.0,
+                transacaoId     = null,
+                clienteId       = clienteId.ifBlank { null },
+                crossSell       = crossSell,
+                cupomCodigo     = cupomCodigo,
+                valorBruto      = valorBruto,
+            )
+            result.onSuccess { ciclo ->
+                for (extra in selectedExtras) repository.adicionarExtra(ciclo.id, extra.id)
+                _uiState.update { it.copy(isCreatingCiclo = false, cicloId = ciclo.id, acquirerKey = "") }
+            }.onFailure { ex ->
+                val ativo = (ex as? CicloConflictException)?.ativo
+                _uiState.update {
+                    if (ativo != null) it.copy(isCreatingCiclo = false, cicloId = ativo.id, acquirerKey = "")
+                    else it.copy(isCreatingCiclo = false, erroSemCobranca = ex.message ?: "Não foi possível usar o cupom")
+                }
+            }
+        }
     }
 
     fun cancel() {
@@ -114,6 +149,7 @@ class PaymentViewModel(
                 PaymentMethod.CREDIT -> "CARTAO_CREDITO"
                 PaymentMethod.DEBIT  -> "CARTAO_DEBITO"
                 PaymentMethod.PIX    -> "PIX"
+                PaymentMethod.CUPOM  -> "CUPOM" // não chega aqui: não passa pela Stone
             }
             val cicloResult = repository.criarCiclo(
                 produtoId       = washOption.id,
@@ -123,6 +159,8 @@ class PaymentViewModel(
                 transacaoId     = state.result.acquirerTransactionKey,
                 clienteId       = clienteId.ifBlank { null },
                 crossSell       = crossSell,
+                cupomCodigo     = cupomCodigo,
+                valorBruto      = valorBruto,
             )
             if (cicloResult.isFailure) {
                 val ex = cicloResult.exceptionOrNull()
@@ -169,9 +207,14 @@ class PaymentViewModel(
         private val paymentMethod: PaymentMethod,
         private val clienteId: String = "",
         private val crossSell: Boolean = false,
+        private val cupomCodigo: String? = null,
+        private val valorBruto: Double? = null,
     ) : ViewModelProvider.Factory {
         @Suppress("UNCHECKED_CAST")
         override fun <T : ViewModel> create(modelClass: Class<T>): T =
-            PaymentViewModel(stone, repository, washOption, selectedExtras, totalMinutes, totalPrice, paymentMethod, clienteId, crossSell) as T
+            PaymentViewModel(
+                stone, repository, washOption, selectedExtras, totalMinutes, totalPrice, paymentMethod,
+                clienteId, crossSell, cupomCodigo, valorBruto,
+            ) as T
     }
 }

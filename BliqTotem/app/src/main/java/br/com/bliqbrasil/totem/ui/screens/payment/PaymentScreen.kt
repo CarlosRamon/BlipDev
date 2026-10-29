@@ -58,7 +58,21 @@ fun PaymentScreen(
         modifier = Modifier.fillMaxSize().background(palette.background).navigationBarsPadding(),
         contentAlignment = Alignment.Center,
     ) {
-        when (val state = uiState.paymentState) {
+        if (viewModel.paymentMethod == PaymentMethod.CUPOM) {
+            val erro = uiState.erroSemCobranca
+            if (erro != null) {
+                FailureContent(message = erro, onRetry = { viewModel.retry(activity) }, onBack = onBack)
+            } else {
+                StatusContent(
+                    icon        = BliqIcons.Cupom,
+                    iconTint    = Primary,
+                    iconBg      = PrimaryLight,
+                    title       = "Cupom aplicado!",
+                    subtitle    = "Liberando seu box...",
+                    showSpinner = true,
+                )
+            }
+        } else when (val state = uiState.paymentState) {
             is PaymentState.Idle,
             is PaymentState.WaitingCard -> WaitingCardContent(onCancel = { viewModel.cancel() })
 
@@ -118,6 +132,7 @@ fun PaymentScreen(
                     PaymentMethod.CREDIT -> BliqIcons.Credit to "Crédito"
                     PaymentMethod.DEBIT  -> BliqIcons.Debit  to "Débito"
                     PaymentMethod.PIX    -> BliqIcons.Pix    to "Pix"
+                    PaymentMethod.CUPOM  -> BliqIcons.Cupom  to "Cupom"
                 }
                 androidx.compose.foundation.layout.Row(
                     verticalAlignment = Alignment.CenterVertically,

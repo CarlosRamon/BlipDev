@@ -43,16 +43,26 @@ object AppDestinations {
         val crossSell: Boolean = false,
     )
 
+    /** Lista de cupons; o escolhido volta ao Checkout pelo savedStateHandle. */
+    @Serializable
+    data class Cupons(
+        val clienteId: String = "",
+        val valorBruto: Double,
+    )
+
     @Serializable
     data class Payment(
         val washOptionJson: String,
         val selectedExtrasJson: String,
         val totalMinutes: Int,
+        // Valor a cobrar, já com desconto. Com cupom, valorBruto é o de tabela.
         val totalPrice: Double,
         val paymentMethod: String,
         val boxTipo: String = "LAVACAO",
         val clienteId: String = "",
         val crossSell: Boolean = false,
+        val cupomCodigo: String? = null,
+        val valorBruto: Double? = null,
     )
 
     @Serializable

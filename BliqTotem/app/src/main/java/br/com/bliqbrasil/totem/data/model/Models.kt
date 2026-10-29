@@ -118,6 +118,43 @@ data class ClienteLookupResponse(
     val nomePreenchido: String?,
 )
 
+// ── Cupons ─────────────────────────────────────────────────────────────────
+
+/**
+ * Cupom como o backend devolve na lista e na validação. `desconto` e
+ * `valorFinal` vêm calculados pelo servidor quando o totem manda o valor de
+ * tabela; o totem só exibe, não refaz a conta.
+ */
+data class CupomDisponivel(
+    val codigo: String,
+    val descricao: String?,
+    val tipoDesconto: String,       // PERCENTUAL | VALOR_FIXO
+    val valor: Double,
+    val validoAte: String?,
+    val desconto: Double? = null,
+    val valorFinal: Double? = null,
+)
+
+/** ok=false traz `mensagem` pronta para o cliente (ex.: "Este cupom expirou"). */
+data class ValidarCupomResponse(
+    val ok: Boolean,
+    val motivo: String? = null,
+    val mensagem: String? = null,
+    val codigo: String? = null,
+    val descricao: String? = null,
+    val tipoDesconto: String? = null,
+    val valor: Double? = null,
+    val desconto: Double? = null,
+    val valorFinal: Double? = null,
+)
+
+data class ValidarCupomRequest(
+    val codigo: String,
+    val valorBruto: Double,
+    val clienteId: String? = null,
+    val crossSell: Boolean = false,
+)
+
 // ── API request models ─────────────────────────────────────────────────────
 
 data class AtivarRequest(val codigo: String)
@@ -130,6 +167,9 @@ data class CriarCicloRequest(
     val transacaoId: String? = null,
     val clienteId: String? = null,
     val crossSell: Boolean = false,
+    // Com cupom: valor é o cobrado e valorBruto o de tabela (pacote + extras).
+    val cupomCodigo: String? = null,
+    val valorBruto: Double? = null,
 )
 
 data class CriarClienteRequest(
@@ -190,7 +230,8 @@ data class WashOptionExtra(
     val preco: Double,
 )
 
-enum class PaymentMethod { CREDIT, DEBIT, PIX }
+/** CUPOM = total zerado por cupom: não passa pela Stone. */
+enum class PaymentMethod { CREDIT, DEBIT, PIX, CUPOM }
 
 enum class Machine(val label: String, val icon: String, val colorHex: Long) {
     PRE_LAVAGEM  ("Pré-lavagem",   "💦", 0xFF1A73E8),

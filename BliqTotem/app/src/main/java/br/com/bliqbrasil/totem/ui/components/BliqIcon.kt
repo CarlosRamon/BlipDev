@@ -19,6 +19,7 @@ import androidx.compose.material.icons.filled.Contactless
 import androidx.compose.material.icons.filled.CreditCard
 import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.HelpOutline
+import androidx.compose.material.icons.filled.LocalOffer
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.QrCode2
 import androidx.compose.material.icons.filled.Speed
@@ -57,6 +58,7 @@ object BliqIcons {
     val Help: ImageVector      = Icons.Filled.HelpOutline
     val Speed: ImageVector     = Icons.Filled.Speed
     val Touch: ImageVector     = Icons.Filled.TouchApp
+    val Cupom: ImageVector     = Icons.Filled.LocalOffer
 
     // Ícones das máquinas do box — substituem os emoji do enum Machine,
     // que o brandbook proíbe na interface.

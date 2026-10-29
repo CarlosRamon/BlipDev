@@ -100,6 +100,7 @@ fun SuccessScreen(
                                     PaymentMethod.CREDIT -> "Cartão de Crédito"
                                     PaymentMethod.DEBIT  -> "Cartão de Débito"
                                     PaymentMethod.PIX    -> "Pix"
+                                    PaymentMethod.CUPOM  -> "Cupom de desconto"
                                 },
                                 fontFamily = Epilogue,
                                 fontWeight = FontWeight.SemiBold,
