@@ -1,9 +1,15 @@
 package br.com.bliqbrasil.totem.ui.screens.welcome
 
+import android.app.Activity
+import android.content.Context
+import android.content.ContextWrapper
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.waitForUpOrCancellation
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -13,7 +19,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -22,12 +30,17 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import br.com.bliqbrasil.totem.R
 import br.com.bliqbrasil.totem.data.model.ConnectionStatus
+import br.com.bliqbrasil.totem.kiosk.KioskManager
 import br.com.bliqbrasil.totem.ui.components.BliqIcons
 import br.com.bliqbrasil.totem.ui.theme.*
+
+/** Tempo segurando o "Toque para iniciar" até abrir a senha do modo quiosque. */
+private const val SEGURAR_QUIOSQUE_MS = 10_000L
 
 @Composable
 fun WelcomeScreen(
     viewModel: WelcomeViewModel,
+    kiosk: KioskManager,
     onStartFlow: () -> Unit,
     onNeedActivation: () -> Unit,
     onResumeSession: (cicloId: String, totalMinutes: Int, resumeFromSeconds: Int?, boxTipo: String) -> Unit,
@@ -38,6 +51,11 @@ fun WelcomeScreen(
 
     var logoTapCount by remember { mutableIntStateOf(0) }
     var showResetDialog by remember { mutableStateOf(false) }
+    var showKioskDialog by remember { mutableStateOf(false) }
+    // O clique do botão chega ao soltar o dedo — depois de segurar os 10s ele
+    // não pode iniciar o fluxo.
+    var seguraramQuiosque by remember { mutableStateOf(false) }
+    val activity = LocalContext.current.findActivity()
 
     LaunchedEffect(logoTapCount) {
         if (logoTapCount in 1..6) {
@@ -80,6 +98,19 @@ fun WelcomeScreen(
                     Text("Cancelar", fontFamily = Epilogue)
                 }
             },
+        )
+    }
+
+    if (showKioskDialog) {
+        KioskSenhaDialog(
+            ativo            = kiosk.ativo,
+            bloqueioCompleto = kiosk.bloqueioCompleto,
+            senhaConfere     = kiosk::senhaConfere,
+            onConfirmar      = {
+                showKioskDialog = false
+                if (kiosk.ativo) kiosk.desativar(activity) else kiosk.ativar(activity)
+            },
+            onDismiss        = { showKioskDialog = false },
         )
     }
 
@@ -136,11 +167,30 @@ fun WelcomeScreen(
             when (state.pingState) {
                 WelcomeViewModel.PingState.IDLE -> {
                     Button(
-                        onClick  = viewModel::onStart,
+                        onClick  = {
+                            if (seguraramQuiosque) seguraramQuiosque = false else viewModel.onStart()
+                        },
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(64.dp)
-                            .scale(scale),
+                            .scale(scale)
+                            // Passe Initial: observa o toque antes do Button, sem consumi-lo,
+                            // para manter o ripple e o clique normal.
+                            .pointerInput(Unit) {
+                                awaitEachGesture {
+                                    awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
+                                    seguraramQuiosque = false
+                                    // null só no timeout; soltar ou arrastar para fora encerra antes.
+                                    val terminou = withTimeoutOrNull(SEGURAR_QUIOSQUE_MS) {
+                                        waitForUpOrCancellation(PointerEventPass.Initial)
+                                        true
+                                    }
+                                    if (terminou == null) {
+                                        seguraramQuiosque = true
+                                        showKioskDialog = true
+                                    }
+                                }
+                            },
                         colors = ButtonDefaults.buttonColors(
                             containerColor = palette.ctaContainer,
                             contentColor   = palette.onCtaContainer,
@@ -223,4 +273,10 @@ fun WelcomeScreen(
             Text(label, fontFamily = Epilogue, fontSize = 13.sp, color = palette.onBackground.copy(alpha = 0.6f))
         }
     }
+}
+
+private tailrec fun Context.findActivity(): Activity = when (this) {
+    is Activity       -> this
+    is ContextWrapper -> baseContext.findActivity()
+    else              -> error("WelcomeScreen fora de uma Activity")
 }

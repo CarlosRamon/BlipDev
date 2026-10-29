@@ -20,6 +20,7 @@ import br.com.bliqbrasil.totem.diagnostics.Categoria
 import br.com.bliqbrasil.totem.diagnostics.DiagnosticLogger
 import br.com.bliqbrasil.totem.diagnostics.NetworkMonitor
 import br.com.bliqbrasil.totem.diagnostics.Severidade
+import br.com.bliqbrasil.totem.kiosk.KioskManager
 import br.com.bliqbrasil.totem.payment.stone.StonePaymentManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -49,6 +50,8 @@ class BliqTotemApp : Application() {
     val networkMonitor: NetworkMonitor by lazy { NetworkMonitor(this, diagnostico) }
 
     val heartbeat: HeartbeatLoop by lazy { HeartbeatLoop(repository, bleManager, tokenStorage, networkMonitor) }
+
+    val kiosk: KioskManager by lazy { KioskManager(this, diagnostico) }
 
     private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 

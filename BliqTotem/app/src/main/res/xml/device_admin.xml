@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Nenhuma política de senha/wipe: o admin só serve para o modo quiosque. -->
+<device-admin>
+    <uses-policies />
+</device-admin>

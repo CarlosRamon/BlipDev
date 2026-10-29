@@ -67,6 +67,7 @@ fun NavGraph(navController: NavHostController, app: BliqTotemApp) {
             )
             WelcomeScreen(
                 viewModel = vm,
+                kiosk = app.kiosk,
                 // Com a identificação desativada na franquia, o CPF sai do fluxo:
                 // vai direto para a escolha do serviço, sem cliente vinculado.
                 onStartFlow = {

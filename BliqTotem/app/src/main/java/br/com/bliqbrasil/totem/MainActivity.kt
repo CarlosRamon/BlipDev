@@ -3,6 +3,7 @@ package br.com.bliqbrasil.totem
 import android.os.Bundle
 import android.view.WindowManager
 import androidx.activity.ComponentActivity
+import androidx.activity.addCallback
 import androidx.activity.compose.setContent
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -25,6 +26,17 @@ class MainActivity : ComponentActivity() {
 
         val app = application as BliqTotemApp
 
+        // Registrado antes do NavHost, então só recebe o Voltar quando não há
+        // tela para desempilhar. Com o quiosque ligado, fechar o app ali
+        // derrubaria o bloqueio — ignora; sem ele, mantém o comportamento padrão.
+        onBackPressedDispatcher.addCallback(this) {
+            if (!app.kiosk.ativo) {
+                isEnabled = false
+                onBackPressedDispatcher.onBackPressed()
+                isEnabled = true
+            }
+        }
+
         setContent {
             val boxTipoRaw by app.tokenStorage.boxTipo.collectAsStateWithLifecycle()
 
@@ -45,6 +57,11 @@ class MainActivity : ComponentActivity() {
                 )
             }
         }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        (application as BliqTotemApp).kiosk.aplicar(this)
     }
 
     override fun onWindowFocusChanged(hasFocus: Boolean) {
