@@ -174,7 +174,7 @@ fun SessionScreen(
                         } else {
                             Surface(shape = RoundedCornerShape(20.dp), color = palette.chipSoft) {
                                 Text(
-                                    if (viewModel.boxTipo == "ASPIRACAO") "Selecione um serviço" else "Selecione um equipamento",
+                                    "Selecione um serviço",
                                     fontFamily = Epilogue,
                                     color = Tertiary,
                                     fontSize = 14.sp,
@@ -198,7 +198,7 @@ fun SessionScreen(
             }
 
             item {
-                val label = if (viewModel.boxTipo == "ASPIRACAO") "SELECIONAR SERVIÇO" else "SELECIONAR EQUIPAMENTO"
+                val label = "SELECIONAR SERVIÇO"
                 Text(label, fontFamily = Epilogue, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = palette.onBackground.copy(alpha = 0.85f), letterSpacing = 0.5.sp)
             }
 
