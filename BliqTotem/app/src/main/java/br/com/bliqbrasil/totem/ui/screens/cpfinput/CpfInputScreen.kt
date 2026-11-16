@@ -33,7 +33,11 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.repeatOnLifecycle
+import br.com.bliqbrasil.totem.data.model.CicloAtivo
 import br.com.bliqbrasil.totem.data.model.PoliticaCpf
 import br.com.bliqbrasil.totem.ui.components.OutlineButton
 import br.com.bliqbrasil.totem.ui.components.PrimaryButton
@@ -113,10 +117,21 @@ fun CpfInputScreen(
     viewModel: CpfInputViewModel,
     onBack: () -> Unit,
     onContinue: (clienteId: String) -> Unit,
+    onCicloLiberado: (ciclo: CicloAtivo) -> Unit,
 ) {
     val palette = LocalBoxPalette.current
 
     val state by viewModel.state.collectAsStateWithLifecycle()
+
+    // Brinde/manutenção liberado pelo painel abre a sessão mesmo no meio da
+    // identificação: sem isto o ciclo ficava parado até alguém sair da tela.
+    val lifecycleOwner = LocalLifecycleOwner.current
+    val onCicloLiberadoAtual by rememberUpdatedState(onCicloLiberado)
+    LaunchedEffect(lifecycleOwner) {
+        lifecycleOwner.repeatOnLifecycle(Lifecycle.State.RESUMED) {
+            onCicloLiberadoAtual(viewModel.aguardarCicloLiberado())
+        }
+    }
 
     Scaffold(
         contentWindowInsets = WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom),

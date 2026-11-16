@@ -4,10 +4,12 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import br.com.bliqbrasil.totem.data.local.TokenStorage
+import br.com.bliqbrasil.totem.data.model.CicloAtivo
 import br.com.bliqbrasil.totem.data.model.Cliente
 import br.com.bliqbrasil.totem.data.model.PoliticaCpf
 import br.com.bliqbrasil.totem.data.model.TermosAtual
 import br.com.bliqbrasil.totem.data.repository.PosRepository
+import br.com.bliqbrasil.totem.data.repository.aguardarCicloLiberado
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
@@ -116,6 +118,16 @@ class CpfInputViewModel(
             )
         }
     }
+
+    /**
+     * Brinde/manutenção liberado pelo painel enquanto o totem está na
+     * Identificação. Não interrompe um cadastro sendo gravado.
+     * Roda enquanto a tela está visível (ver CpfInputScreen).
+     */
+    suspend fun aguardarCicloLiberado(): CicloAtivo =
+        repository.aguardarCicloLiberado(
+            podeVerificar = { _state.value.step != CpfStep.REGISTERING },
+        )
 
     private fun buscarCliente(cpf: String) {
         _state.update { it.copy(step = CpfStep.LOADING, error = null) }

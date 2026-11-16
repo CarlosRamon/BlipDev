@@ -5,9 +5,12 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import br.com.bliqbrasil.totem.bluetooth.BliqBleManager
 import br.com.bliqbrasil.totem.data.local.TokenStorage
+import br.com.bliqbrasil.totem.data.model.CicloAtivo
 import br.com.bliqbrasil.totem.data.model.PoliticaCpf
 import br.com.bliqbrasil.totem.data.model.PosConfig
 import br.com.bliqbrasil.totem.data.repository.PosRepository
+import br.com.bliqbrasil.totem.data.repository.aguardarCicloLiberado
+import br.com.bliqbrasil.totem.data.repository.retomarDeSegundos
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -60,20 +63,7 @@ class WelcomeViewModel(
                 }
 
                 // Sessão ativa: pula welcome/CPF e vai direto pra Session
-                repository.getCicloAtivo().getOrNull()?.let { ciclo ->
-                    if (ciclo != null && ciclo.segundosRestantes > 0) {
-                        _state.update {
-                            it.copy(
-                                activeSession = ActiveSession(
-                                    cicloId           = ciclo.id,
-                                    totalMinutes      = ciclo.tempoContratado,
-                                    resumeFromSeconds = if (ciclo.status == "EM_ANDAMENTO") ciclo.segundosRestantes else null,
-                                    boxTipo           = config.box.tipo,
-                                )
-                            )
-                        }
-                    }
-                }
+                verificarCicloAtivo(config.box.tipo)
             }.onFailure { e ->
                 val msg = e.message ?: ""
                 if (msg.contains("401") || msg.contains("Token", ignoreCase = true)) {
@@ -81,6 +71,40 @@ class WelcomeViewModel(
                     _state.update { it.copy(needsActivation = true) }
                 }
             }
+        }
+    }
+
+    private suspend fun verificarCicloAtivo(boxTipo: String) {
+        val ciclo = repository.getCicloAtivo().getOrNull() ?: return
+        if (ciclo.segundosRestantes > 0) abrirSessao(ciclo, boxTipo)
+    }
+
+    private fun abrirSessao(ciclo: CicloAtivo, boxTipo: String) {
+        if (_state.value.activeSession != null) return
+        _state.update {
+            it.copy(
+                activeSession = ActiveSession(
+                    cicloId           = ciclo.id,
+                    totalMinutes      = ciclo.tempoContratado,
+                    resumeFromSeconds = ciclo.retomarDeSegundos,
+                    boxTipo           = boxTipo,
+                )
+            )
+        }
+    }
+
+    /**
+     * Sem isto a Welcome só consultava ao abrir, e o brinde/manutenção liberado
+     * pelo painel só aparecia depois de o cliente ir para o CPF/Home e voltar.
+     * Roda enquanto a tela está visível (ver WelcomeScreen).
+     */
+    suspend fun vigiarCicloLiberado() {
+        while (true) {
+            val ciclo = repository.aguardarCicloLiberado(
+                // Só depois do /config, e não no meio do "iniciar" do cliente.
+                podeVerificar = { _state.value.config != null && _state.value.pingState == PingState.IDLE },
+            )
+            _state.value.config?.let { abrirSessao(ciclo, it.box.tipo) }
         }
     }
 

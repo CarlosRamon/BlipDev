@@ -27,7 +27,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.repeatOnLifecycle
 import br.com.bliqbrasil.totem.R
 import br.com.bliqbrasil.totem.data.model.ConnectionStatus
 import br.com.bliqbrasil.totem.kiosk.KioskManager
@@ -66,6 +69,14 @@ fun WelcomeScreen(
 
     LaunchedEffect(state.needsActivation) {
         if (state.needsActivation) onNeedActivation()
+    }
+
+    // Brinde/manutenção liberados pelo painel aparecem sem o cliente tocar em nada.
+    val lifecycleOwner = LocalLifecycleOwner.current
+    LaunchedEffect(lifecycleOwner) {
+        lifecycleOwner.repeatOnLifecycle(Lifecycle.State.RESUMED) {
+            viewModel.vigiarCicloLiberado()
+        }
     }
 
     LaunchedEffect(state.activeSession) {

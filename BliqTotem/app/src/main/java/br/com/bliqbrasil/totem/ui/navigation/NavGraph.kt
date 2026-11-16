@@ -11,6 +11,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.toRoute
 import br.com.bliqbrasil.totem.BliqTotemApp
+import br.com.bliqbrasil.totem.data.repository.retomarDeSegundos
 import br.com.bliqbrasil.totem.data.model.WashOption
 import br.com.bliqbrasil.totem.data.model.WashOptionExtra
 import br.com.bliqbrasil.totem.ui.screens.activation.ActivationScreen
@@ -110,7 +111,17 @@ fun NavGraph(navController: NavHostController, app: BliqTotemApp) {
                     navController.navigate(AppDestinations.Home(clienteId = clienteId)) {
                         popUpTo(AppDestinations.CpfInput) { inclusive = true }
                     }
-                }
+                },
+                onCicloLiberado = { ciclo ->
+                    navController.navigate(
+                        AppDestinations.Session(
+                            cicloId           = ciclo.id,
+                            totalMinutes      = ciclo.tempoContratado,
+                            boxTipo           = app.tokenStorage.boxTipo.value,
+                            resumeFromSeconds = ciclo.retomarDeSegundos,
+                        )
+                    ) { popUpTo(0) { inclusive = true } }
+                },
             )
         }
 
