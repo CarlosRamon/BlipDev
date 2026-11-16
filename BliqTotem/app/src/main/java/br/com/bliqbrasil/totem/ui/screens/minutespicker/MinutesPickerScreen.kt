@@ -18,7 +18,7 @@ import br.com.bliqbrasil.totem.ui.theme.*
 import br.com.bliqbrasil.totem.util.formatCurrency
 
 private const val STEP = 1
-private const val MIN_MINUTES = 1
+private const val MIN_MINUTES = 3
 private const val MAX_MINUTES = 120
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -30,7 +30,7 @@ fun MinutesPickerScreen(
 ) {
     val palette = LocalBoxPalette.current
 
-    var minutes by remember { mutableIntStateOf(1) }
+    var minutes by remember { mutableIntStateOf(MIN_MINUTES) }
     val totalPrice = minutes * washOption.price
 
     Scaffold(
