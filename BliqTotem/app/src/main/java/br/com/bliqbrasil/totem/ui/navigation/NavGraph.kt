@@ -286,6 +286,7 @@ fun NavGraph(navController: NavHostController, app: BliqTotemApp) {
                 factory = PaymentViewModel.Factory(
                     stone          = app.stonePaymentManager,
                     repository     = app.repository,
+                    diagnostico    = app.diagnostico,
                     washOption     = route.washOptionJson.toWashOption(),
                     selectedExtras = route.selectedExtrasJson.toWashOptionExtras(),
                     totalMinutes   = route.totalMinutes,
@@ -317,7 +318,12 @@ fun NavGraph(navController: NavHostController, app: BliqTotemApp) {
                         )
                     ) { popUpTo(AppDestinations.Checkout::class) { inclusive = true } }
                 },
-                onBack = { navController.popBackStack() }
+                onBack = { navController.popBackStack() },
+                onHome = {
+                    if (!navController.popBackStack(AppDestinations.Home::class, inclusive = false)) {
+                        navController.popBackStack()
+                    }
+                },
             )
         }
 

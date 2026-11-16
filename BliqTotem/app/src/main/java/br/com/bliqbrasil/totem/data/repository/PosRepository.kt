@@ -7,7 +7,8 @@ import br.com.bliqbrasil.totem.data.network.safeApiCall
 import kotlinx.coroutines.delay
 import retrofit2.HttpException
 
-class CicloConflictException(val ativo: CicloAtivo?) : Exception("Sessão já ativa")
+/** 409 ao criar ciclo. A mensagem vem do backend ("Box em uso", "Box offline", "Box em manutenção"). */
+class CicloConflictException(val ativo: CicloAtivo?, message: String = "Sessão já ativa") : Exception(message)
 
 class PosRepository(private val api: ApiService) {
 
@@ -68,12 +69,13 @@ class PosRepository(private val api: ApiService) {
         )
     } catch (e: HttpException) {
         if (e.code() == 409) {
+            val mensagem = e.apiMessage()
             val ativo = try {
                 val resp = api.getCicloAtivo()
                 val body = if (resp.isSuccessful) resp.body() else null
                 if (body != null && body.segundosRestantes > 0) body else null
             } catch (_: Exception) { null }
-            Result.failure(CicloConflictException(ativo))
+            Result.failure(CicloConflictException(ativo, mensagem))
         } else {
             Result.failure(Exception(e.apiMessage()))
         }

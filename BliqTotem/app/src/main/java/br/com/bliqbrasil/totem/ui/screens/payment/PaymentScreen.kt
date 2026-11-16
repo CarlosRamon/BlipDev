@@ -35,6 +35,7 @@ fun PaymentScreen(
     viewModel: PaymentViewModel,
     onSuccess: (cicloId: String, acquirerKey: String) -> Unit,
     onBack: () -> Unit,
+    onHome: () -> Unit,
 ) {
     val palette = LocalBoxPalette.current
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -98,14 +99,26 @@ fun PaymentScreen(
                 subtitle = "Aguarde a confirmação",
             )
 
-            is PaymentState.Success -> StatusContent(
-                icon        = BliqIcons.CheckCircle,
-                iconTint    = Success,
-                iconBg      = SuccessLight,
-                title       = "Aprovado!",
-                subtitle    = if (uiState.isCreatingCiclo) "Registrando ciclo..." else "Concluído",
-                showSpinner = uiState.isCreatingCiclo,
-            )
+            is PaymentState.Success -> {
+                val erro = uiState.erroRegistro
+                if (erro != null) {
+                    PagoSemCicloContent(
+                        message     = erro,
+                        transacaoId = state.result.acquirerTransactionKey,
+                        onRetry     = { viewModel.tentarRegistrarDeNovo() },
+                        onHome      = onHome,
+                    )
+                } else {
+                    StatusContent(
+                        icon        = BliqIcons.CheckCircle,
+                        iconTint    = Success,
+                        iconBg      = SuccessLight,
+                        title       = "Aprovado!",
+                        subtitle    = "Liberando seu box...",
+                        showSpinner = true,
+                    )
+                }
+            }
 
             is PaymentState.Failure -> FailureContent(
                 message = state.message.ifBlank { "Tente novamente" },
@@ -301,6 +314,41 @@ private fun StatusContent(
         if (showSpinner) {
             CircularProgressIndicator(color = palette.onBackground, modifier = Modifier.size(32.dp), strokeWidth = 3.dp)
         }
+    }
+}
+
+/** Cobrança aprovada, mas o ciclo não foi registrado. Não oferece pagar de novo. */
+@Composable
+private fun PagoSemCicloContent(message: String, transacaoId: String?, onRetry: () -> Unit, onHome: () -> Unit) {
+    val palette = LocalBoxPalette.current
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(20.dp),
+        modifier = Modifier.padding(start = 32.dp, end = 32.dp, top = 32.dp, bottom = 32.dp + BliqDimens.BottomSafeGap),
+    ) {
+        Box(
+            contentAlignment = Alignment.Center,
+            modifier = Modifier
+                .size(120.dp)
+                .clip(CircleShape)
+                .background(WarningLight),
+        ) {
+            Icon(imageVector = BliqIcons.CheckCircle, contentDescription = null, tint = Warning, modifier = Modifier.size(64.dp))
+        }
+        Text("PAGAMENTO APROVADO", fontFamily = FugazOne, fontSize = 28.sp, color = palette.onBackground, textAlign = TextAlign.Center)
+        Text(
+            "Mas não conseguimos liberar o box ($message). Não pague de novo: tente mais uma vez ou chame o atendente.",
+            fontFamily = Epilogue, fontSize = 16.sp, color = palette.onBackground.copy(alpha = 0.9f), textAlign = TextAlign.Center,
+        )
+        if (!transacaoId.isNullOrBlank()) {
+            Text(
+                "Código da transação: $transacaoId",
+                fontFamily = Epilogue, fontSize = 13.sp, color = palette.onBackground.copy(alpha = 0.7f), textAlign = TextAlign.Center,
+            )
+        }
+        Spacer(Modifier.height(8.dp))
+        PrimaryButton(label = "Tentar liberar de novo", onClick = onRetry)
+        OutlineButton(label = "Voltar ao início", onClick = onHome)
     }
 }
 

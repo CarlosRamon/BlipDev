@@ -9,6 +9,9 @@ import br.com.bliqbrasil.totem.data.model.WashOption
 import br.com.bliqbrasil.totem.data.model.WashOptionExtra
 import br.com.bliqbrasil.totem.data.repository.CicloConflictException
 import br.com.bliqbrasil.totem.data.repository.PosRepository
+import br.com.bliqbrasil.totem.diagnostics.Categoria
+import br.com.bliqbrasil.totem.diagnostics.DiagnosticLogger
+import br.com.bliqbrasil.totem.diagnostics.Severidade
 import br.com.bliqbrasil.totem.payment.stone.PaymentState
 import br.com.bliqbrasil.totem.payment.stone.StonePaymentManager
 import br.com.bliqbrasil.totem.payment.stone.TransactionType
@@ -24,6 +27,7 @@ import java.util.UUID
 class PaymentViewModel(
     private val stone: StonePaymentManager,
     private val repository: PosRepository,
+    private val diagnostico: DiagnosticLogger,
     private val washOption: WashOption,
     private val selectedExtras: List<WashOptionExtra>,
     private val totalMinutes: Int,
@@ -44,6 +48,9 @@ class PaymentViewModel(
         // Compra zerada por cupom: o backend recusou (cupom deixou de valer ou
         // não cobre mais o total). Nada foi cobrado, então dá para voltar.
         val erroSemCobranca: String? = null,
+        // Cartão/PIX aprovado na Stone, mas o backend não registrou o ciclo depois
+        // das retentativas. O cliente JÁ FOI COBRADO: a tela precisa de saída.
+        val erroRegistro: String? = null,
     )
 
     private val _uiState = MutableStateFlow(UiState())
@@ -51,9 +58,13 @@ class PaymentViewModel(
 
     private var paymentStarted = false
     private var timeoutJob: Job? = null
+    private var pagamentoAprovado: PaymentState.Success? = null
+    private var registroJob: Job? = null
 
     companion object {
         private const val PAYMENT_TIMEOUT_MS = 90_000L
+        // Espera antes de cada nova tentativa de registrar o ciclo (3 tentativas no total).
+        private val ESPERAS_RETENTATIVA_MS = longArrayOf(2_000L, 5_000L)
     }
 
     init {
@@ -143,51 +154,74 @@ class PaymentViewModel(
 
     private fun onPaymentSuccess(state: PaymentState.Success) {
         timeoutJob?.cancel()
-        viewModelScope.launch {
-            _uiState.update { it.copy(isCreatingCiclo = true) }
-            val metodoPagamento = when (paymentMethod) {
-                PaymentMethod.CREDIT -> "CARTAO_CREDITO"
-                PaymentMethod.DEBIT  -> "CARTAO_DEBITO"
-                PaymentMethod.PIX    -> "PIX"
-                PaymentMethod.CUPOM  -> "CUPOM" // não chega aqui: não passa pela Stone
-            }
-            val cicloResult = repository.criarCiclo(
-                produtoId       = washOption.id,
-                tempoContratado = totalMinutes,
-                metodoPagamento = metodoPagamento,
-                valor           = totalPrice,
-                transacaoId     = state.result.acquirerTransactionKey,
-                clienteId       = clienteId.ifBlank { null },
-                crossSell       = crossSell,
-                cupomCodigo     = cupomCodigo,
-                valorBruto      = valorBruto,
-            )
-            if (cicloResult.isFailure) {
+        if (pagamentoAprovado != null) return
+        pagamentoAprovado = state
+        registrarCicloPago(state)
+    }
+
+    /** Botão da tela de erro: tenta registrar de novo o ciclo do pagamento já aprovado (não cobra outra vez). */
+    fun tentarRegistrarDeNovo() {
+        val state = pagamentoAprovado ?: return
+        if (registroJob?.isActive == true) return
+        registrarCicloPago(state)
+    }
+
+    private fun registrarCicloPago(state: PaymentState.Success) {
+        val acquirerKey = state.result.acquirerTransactionKey ?: ""
+        val metodoPagamento = when (paymentMethod) {
+            PaymentMethod.CREDIT -> "CARTAO_CREDITO"
+            PaymentMethod.DEBIT  -> "CARTAO_DEBITO"
+            PaymentMethod.PIX    -> "PIX"
+            PaymentMethod.CUPOM  -> "CUPOM" // não chega aqui: não passa pela Stone
+        }
+        registroJob = viewModelScope.launch {
+            _uiState.update { it.copy(isCreatingCiclo = true, erroRegistro = null) }
+            var ultimoErro: Throwable? = null
+            // Retentar é seguro: se uma tentativa criou o ciclo e só a resposta se
+            // perdeu, a próxima recebe 409 com o ciclo ativo e segue para ele.
+            for (tentativa in 0..ESPERAS_RETENTATIVA_MS.size) {
+                if (tentativa > 0) delay(ESPERAS_RETENTATIVA_MS[tentativa - 1])
+                val cicloResult = repository.criarCiclo(
+                    produtoId       = washOption.id,
+                    tempoContratado = totalMinutes,
+                    metodoPagamento = metodoPagamento,
+                    valor           = totalPrice,
+                    transacaoId     = state.result.acquirerTransactionKey,
+                    clienteId       = clienteId.ifBlank { null },
+                    crossSell       = crossSell,
+                    cupomCodigo     = cupomCodigo,
+                    valorBruto      = valorBruto,
+                )
+                val ciclo = cicloResult.getOrNull()
+                if (ciclo != null) {
+                    for (extra in selectedExtras) {
+                        repository.adicionarExtra(ciclo.id, extra.id)
+                    }
+                    _uiState.update { it.copy(isCreatingCiclo = false, cicloId = ciclo.id, acquirerKey = acquirerKey) }
+                    return@launch
+                }
                 val ex = cicloResult.exceptionOrNull()
                 if (ex is CicloConflictException && ex.ativo != null) {
-                    // Session already active from a previous payment — navigate to it directly
-                    _uiState.update {
-                        it.copy(
-                            isCreatingCiclo = false,
-                            cicloId         = ex.ativo.id,
-                            acquirerKey     = state.result.acquirerTransactionKey ?: "",
-                        )
-                    }
-                } else {
-                    _uiState.update { it.copy(isCreatingCiclo = false) }
+                    // Já existe sessão ativa neste terminal — segue direto para ela.
+                    _uiState.update { it.copy(isCreatingCiclo = false, cicloId = ex.ativo.id, acquirerKey = acquirerKey) }
+                    return@launch
                 }
-                return@launch
+                ultimoErro = ex
             }
-            val ciclo = cicloResult.getOrThrow()
-            for (extra in selectedExtras) {
-                repository.adicionarExtra(ciclo.id, extra.id)
-            }
+            diagnostico.log(
+                Categoria.PAGAMENTO, "CICLO_NAO_REGISTRADO", Severidade.ERRO,
+                "Pagamento aprovado sem ciclo: ${ultimoErro?.message}",
+                dados = mapOf(
+                    "metodo"      to metodoPagamento,
+                    "valor"       to totalPrice,
+                    "transacaoId" to acquirerKey,
+                    "produtoId"   to washOption.id,
+                    "tentativas"  to ESPERAS_RETENTATIVA_MS.size + 1,
+                ),
+            )
+            diagnostico.enviarAgora()
             _uiState.update {
-                it.copy(
-                    isCreatingCiclo = false,
-                    cicloId         = ciclo.id,
-                    acquirerKey     = state.result.acquirerTransactionKey ?: "",
-                )
+                it.copy(isCreatingCiclo = false, erroRegistro = ultimoErro?.message ?: "Não foi possível liberar o box")
             }
         }
     }
@@ -200,6 +234,7 @@ class PaymentViewModel(
     class Factory(
         private val stone: StonePaymentManager,
         private val repository: PosRepository,
+        private val diagnostico: DiagnosticLogger,
         private val washOption: WashOption,
         private val selectedExtras: List<WashOptionExtra>,
         private val totalMinutes: Int,
@@ -213,7 +248,7 @@ class PaymentViewModel(
         @Suppress("UNCHECKED_CAST")
         override fun <T : ViewModel> create(modelClass: Class<T>): T =
             PaymentViewModel(
-                stone, repository, washOption, selectedExtras, totalMinutes, totalPrice, paymentMethod,
+                stone, repository, diagnostico, washOption, selectedExtras, totalMinutes, totalPrice, paymentMethod,
                 clienteId, crossSell, cupomCodigo, valorBruto,
             ) as T
     }
