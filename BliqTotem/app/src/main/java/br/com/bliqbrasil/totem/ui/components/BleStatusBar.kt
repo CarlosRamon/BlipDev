@@ -26,16 +26,16 @@ private data class StatusConfig(
 )
 
 private fun configFor(status: ConnectionStatus) = when (status) {
-    ConnectionStatus.DISCONNECTED -> StatusConfig(Tertiary, "Conectando ao CLP...",  true,  false)
-    ConnectionStatus.SCANNING     -> StatusConfig(Warning,  "Procurando CLP...",      true,  false)
-    ConnectionStatus.CONNECTING   -> StatusConfig(Warning,  "Conectando...",          true,  false)
-    ConnectionStatus.CONNECTED    -> StatusConfig(Success,  "CLP conectado",          false, false)
-    ConnectionStatus.RECONNECTING -> StatusConfig(Warning,  "Reconectando ao CLP...", true,  false)
-    ConnectionStatus.ERROR        -> StatusConfig(Error,    "Falha na conexão",       false, true)
+    ConnectionStatus.DISCONNECTED -> StatusConfig(Tertiary, "Conectando ao COREB...",   true,  false)
+    ConnectionStatus.SCANNING     -> StatusConfig(Warning,  "Procurando COREB...",      true,  false)
+    ConnectionStatus.CONNECTING   -> StatusConfig(Warning,  "Conectando...",            true,  false)
+    ConnectionStatus.CONNECTED    -> StatusConfig(Success,  "COREB conectado",          false, false)
+    ConnectionStatus.RECONNECTING -> StatusConfig(Warning,  "Reconectando ao COREB...", true,  false)
+    ConnectionStatus.ERROR        -> StatusConfig(Error,    "Falha na conexão",         false, true)
 }
 
 /**
- * Chip de status do CLP. Nos mockups é uma pill de contorno sobre o fundo da
+ * Chip de status do COREB. Nos mockups é uma pill de contorno sobre o fundo da
  * tela — fundo transparente e borda fina —, não um card branco elevado.
  */
 @Composable
@@ -106,7 +106,7 @@ fun BleStatusBar(
 }
 
 /**
- * Versão discreta do status do CLP para a barra superior: só o ponto e o
+ * Versão discreta do status do COREB para a barra superior: só o ponto e o
  * rótulo, na cor do texto da barra. Em falha, tocar força a reconexão.
  */
 @Composable
