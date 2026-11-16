@@ -206,7 +206,9 @@ fun SessionScreen(
                 MachineCard(
                     machine = machine,
                     isActive = state.activeMachine == machine,
-                    isDisabled = state.isEnding,
+                    // Sem conexão o toque não aciona nada: cada um esperava 15s e
+                    // falhava, e o cliente tocava de novo (222 toques em 3 sessões).
+                    isDisabled = state.isEnding || bleStatus != ConnectionStatus.CONNECTED,
                     palette = palette,
                     onClick = { viewModel.selectMachine(machine) },
                 )

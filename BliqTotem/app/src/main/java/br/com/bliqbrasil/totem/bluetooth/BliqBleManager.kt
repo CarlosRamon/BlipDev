@@ -36,6 +36,10 @@ import kotlin.coroutines.resumeWithException
 private const val CCCD_UUID            = "00002902-0000-1000-8000-00805f9b34fb"
 private const val SCAN_TIMEOUT_MS      = 10_000L
 private const val KEEPALIVE_INTERVAL_MS = 30_000L
+// Sem negociar, o BLE fica em 23 bytes: a ESP só consegue mandar 20 bytes por
+// notificação e o resto do STATUS (tempo, máquina, telemetria) se perde.
+private const val MTU_DESEJADO         = 247
+private const val MTU_PADRAO           = 23
 
 // Backoff delays between retry attempts: 3s, 5s, 8s, 12s, 15s, 15s…
 private val RECONNECT_DELAYS = listOf(3_000L, 5_000L, 8_000L, 12_000L, 15_000L)
@@ -103,6 +107,8 @@ class BliqBleManager(
     private var writeCont:      CancellableContinuation<Unit>? = null
     private var descriptorCont: CancellableContinuation<Unit>? = null
     @Volatile private var rssiCont: CancellableContinuation<Unit>? = null
+    @Volatile private var mtuCont: CancellableContinuation<Int>? = null
+    @Volatile private var mtuAtual = MTU_PADRAO
 
     // ── Diagnóstico ───────────────────────────────────────────────────────
     // Estado só para o registro de problemas — não interfere na conexão.
@@ -219,6 +225,11 @@ class BliqBleManager(
             rssiCont = null
         }
 
+        override fun onMtuChanged(g: BluetoothGatt, mtu: Int, status: Int) {
+            mtuCont?.resume(if (status == BluetoothGatt.GATT_SUCCESS) mtu else MTU_PADRAO) {}
+            mtuCont = null
+        }
+
     }
 
     // ── Public API ────────────────────────────────────────────────────────
@@ -248,8 +259,16 @@ class BliqBleManager(
         }
     }
 
+    /**
+     * Comando da sessão. Só sai com a conexão verificada: durante a reconexão o
+     * GATT já existe, mas a fila de operações do Android está ocupada com a
+     * verificação, e o comando falhava com "BLE ocupado" ou se perdia.
+     */
     suspend fun sendCommand(json: String) {
         try {
+            if (_status.value != ConnectionStatus.CONNECTED) {
+                throw Exception("Equipamento reconectando. Aguarde.")
+            }
             escrever(json)
         } catch (e: CancellationException) {
             throw e
@@ -493,10 +512,33 @@ class BliqBleManager(
         } catch (_: TimeoutCancellationException) {
             throw Exception("ESP32 não respondeu ao discovery — possível conexão fantasma")
         }
+        etapa = "MTU"
+        mtuAtual = negociarMtu(g)
         etapa = "CARACTERISTICA"
         setupCharacteristic(g)
         etapa = "VERIFICACAO"
         verifyLinkWithWrite()
+    }
+
+    /**
+     * Pede MTU maior. Não é fatal: se a ESP ou a pilha do Android não
+     * responderem, segue com 23 bytes como antes.
+     */
+    private suspend fun negociarMtu(g: BluetoothGatt): Int {
+        val mtu = withTimeoutOrNull(3_000L) {
+            suspendCancellableCoroutine<Int> { cont ->
+                mtuCont = cont
+                cont.invokeOnCancellation { mtuCont = null }
+                if (!g.requestMtu(MTU_DESEJADO)) {
+                    mtuCont = null
+                    cont.resume(MTU_PADRAO) {}
+                }
+            }
+        }
+        if (mtu == null) mtuCont = null
+        val final = mtu ?: MTU_PADRAO
+        Log.d("BliqBLE", "MTU negociado: $final")
+        return final
     }
 
     // Envia STATUS e espera a NOTIFICATION de resposta do ESP32.
@@ -504,9 +546,10 @@ class BliqBleManager(
     // continuar respondendo no nível ATT sem o firmware processar o comando.
     // Só a notification confirma que a camada de aplicação está viva.
     private suspend fun verifyLinkWithWrite() {
+        // escrever(), não sendCommand(): na reconexão o status ainda não é CONNECTED.
         val received = withTimeoutOrNull(3_000L) {
             _notification
-                .onSubscription { sendCommand("""{"action":"STATUS"}""") }
+                .onSubscription { escrever("""{"action":"STATUS"}""") }
                 .filter { it.contains("\"status\":\"STATUS\"") }
                 .first()
         }
@@ -525,23 +568,33 @@ class BliqBleManager(
         val char = service.getCharacteristic(UUID.fromString(charUuid))
             ?: throw Exception("Característica BLE não encontrada. Esperado=$charUuid | Encontradas=${service.characteristics.map { it.uuid }}")
 
-        characteristic = char
         g.setCharacteristicNotification(char, true)
 
-        val descriptor = char.getDescriptor(UUID.fromString(CCCD_UUID)) ?: return
-
-        suspendCancellableCoroutine<Unit> { cont ->
-            descriptorCont = cont
-            val enableValue = BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                g.writeDescriptor(descriptor, enableValue)
-            } else {
-                @Suppress("DEPRECATION")
-                descriptor.value = enableValue
-                @Suppress("DEPRECATION")
-                g.writeDescriptor(descriptor)
+        val descriptor = char.getDescriptor(UUID.fromString(CCCD_UUID))
+        if (descriptor != null) {
+            // Na mesma fila das escritas: o Android só aceita uma operação GATT por vez.
+            writeMutex.withLock {
+                suspendCancellableCoroutine<Unit> { cont ->
+                    descriptorCont = cont
+                    cont.invokeOnCancellation { descriptorCont = null }
+                    val enableValue = BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE
+                    val started = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                        g.writeDescriptor(descriptor, enableValue) == BluetoothStatusCodes.SUCCESS
+                    } else {
+                        @Suppress("DEPRECATION")
+                        descriptor.value = enableValue
+                        @Suppress("DEPRECATION")
+                        g.writeDescriptor(descriptor)
+                    }
+                    if (!started) {
+                        descriptorCont = null
+                        cont.resumeWithException(Exception("writeDescriptor() não iniciou — BLE ocupado"))
+                    }
+                }
             }
         }
+        // Só fica disponível para escrita depois das notificações ligadas.
+        characteristic = char
     }
 
     // ── Diagnóstico ───────────────────────────────────────────────────────
@@ -553,6 +606,7 @@ class BliqBleManager(
             "via" to if (viaScan) "SCAN" else "ENDERECO",
             "dispositivo" to deviceName,
             "ultimoErro" to ultimoErro,
+            "mtu" to mtuAtual,
         )
         foraDoArDesde?.let { dados["foraDoArSegundos"] = (agora - it) / 1000 }
         diagnostico.log(

@@ -219,6 +219,8 @@ class SessionViewModel(
                         }
                     }
                     ConnectionStatus.CONNECTED -> {
+                        // O erro do toque feito durante a queda não vale mais.
+                        _state.update { it.copy(bleError = null) }
                         if (_state.value.sessionStarted && !_state.value.isEnding) {
                             // Libera UI imediatamente — não espera STATUS do ESP para desbloquear
                             _state.update { it.copy(isPaused = false) }
@@ -239,6 +241,10 @@ class SessionViewModel(
         viewModelScope.launch {
             bleManager.notification.collect { json ->
                 if (_state.value.isEnding) return@collect
+                // STATUS da verificação de reconexão chega antes de a conexão ser
+                // liberada: o RESUME que ele dispararia seria recusado. A
+                // ressincronização ao ficar CONNECTED pede outro STATUS.
+                if (bleManager.status.value != ConnectionStatus.CONNECTED) return@collect
                 try {
                     val obj = JSONObject(json)
                     if (obj.optString("status") != "STATUS") return@collect
