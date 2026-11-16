@@ -16,7 +16,11 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.*
+import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.res.painterResource
+import br.com.bliqbrasil.totem.R
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -34,6 +38,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import br.com.bliqbrasil.totem.data.model.WashOption
 import br.com.bliqbrasil.totem.data.model.WashOptionExtra
+import br.com.bliqbrasil.totem.ui.components.OutlineButton
 import br.com.bliqbrasil.totem.ui.components.PrimaryButton
 import br.com.bliqbrasil.totem.ui.components.Sparkle
 import br.com.bliqbrasil.totem.ui.theme.*
@@ -96,10 +101,19 @@ fun ExtrasScreen(
                     extraMinutes = extraMinutes,
                     totalPrice = totalPrice,
                 )
-                PrimaryButton(
-                    label = if (extraMinutes > 0) "Continuar com +$extraMinutes min" else "Continuar sem extras",
-                    onClick = { onContinue(selectedExtras, totalMinutes, totalPrice) },
-                )
+                // Sem extra marcado, seguir é a opção secundária: contorno, para
+                // não competir com o "Adicionar" do card.
+                if (extraMinutes > 0) {
+                    PrimaryButton(
+                        label = "Continuar com +$extraMinutes min",
+                        onClick = { onContinue(selectedExtras, totalMinutes, totalPrice) },
+                    )
+                } else {
+                    OutlineButton(
+                        label = "Continuar sem extras",
+                        onClick = { onContinue(selectedExtras, totalMinutes, totalPrice) },
+                    )
+                }
             }
         }
     ) { padding ->
@@ -148,7 +162,15 @@ private fun Hero() {
 
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            Sparkle(size = 28.dp, color = Warning, modifier = Modifier.scale(sparkleScale))
+            Image(
+                painter = painterResource(R.drawable.bliq_simbolo),
+                contentDescription = null,
+                colorFilter = ColorFilter.tint(palette.onBackground),
+                modifier = Modifier
+                    .height(28.dp)
+                    .aspectRatio(630f / 463f)
+                    .scale(sparkleScale),
+            )
             Text("TURBINE SEU TEMPO", fontFamily = FugazOne, fontSize = 28.sp, color = palette.onBackground)
         }
         Text(
@@ -272,24 +294,54 @@ private fun MinutesBadge(minutes: Int, isSelected: Boolean) {
     }
 }
 
+/**
+ * CTA do extra. Antes de marcar é a peça mais chamativa da tela: laranja (a cor
+ * de destaque, diferente do azul dos demais botões), com sombra e pulsando.
+ * Depois de marcado vira um selo branco, sem animação.
+ */
 @Composable
 private fun AddPill(isSelected: Boolean) {
-    val palette = LocalBoxPalette.current
+    val pulse = rememberInfiniteTransition(label = "addPulse")
+    val pulseScale by pulse.animateFloat(
+        initialValue = 1f,
+        targetValue = 1.04f,
+        animationSpec = infiniteRepeatable(tween(800, easing = FastOutSlowInEasing), RepeatMode.Reverse),
+        label = "addPulseScale",
+    )
+
     Surface(
-        shape = RoundedCornerShape(14.dp),
-        color = if (isSelected) Warning else palette.accent,
-        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        color = if (isSelected) Surface else Warning,
+        shadowElevation = if (isSelected) 0.dp else 6.dp,
+        modifier = Modifier
+            .fillMaxWidth()
+            .scale(if (isSelected) 1f else pulseScale),
     ) {
-        Text(
-            if (isSelected) "✓ ADICIONADO" else "+ ADICIONAR AO MEU TEMPO",
-            fontFamily = Epilogue,
-            fontWeight = FontWeight.Black,
-            fontSize = 15.sp,
-            letterSpacing = 0.5.sp,
-            color = if (isSelected) BliqNavy else Surface,
-            textAlign = TextAlign.Center,
-            modifier = Modifier.padding(vertical = 14.dp),
-        )
+        Row(
+            modifier = Modifier.padding(vertical = 16.dp),
+            horizontalArrangement = Arrangement.Center,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            // "+" na mesma fonte do rótulo: na FugazOne ele ficava abaixo da linha.
+            Text(
+                if (isSelected) "✓" else "+",
+                fontFamily = if (isSelected) FugazOne else Epilogue,
+                fontWeight = FontWeight.Black,
+                fontSize = 24.sp,
+                lineHeight = 24.sp,
+                color = BliqNavy,
+            )
+            Spacer(Modifier.width(8.dp))
+            Text(
+                if (isSelected) "ADICIONADO" else "ADICIONAR AO MEU TEMPO",
+                fontFamily = Epilogue,
+                fontWeight = FontWeight.Black,
+                fontSize = 17.sp,
+                letterSpacing = 0.5.sp,
+                color = BliqNavy,
+                textAlign = TextAlign.Center,
+            )
+        }
     }
 }
 
