@@ -1,0 +1,76 @@
+# Bliq na VPS EVEO — um diretório por ambiente: ~/bliq/staging, ~/bliq/prod.
+# Mesmo arquivo nos dois; o que muda fica no .env (AMBIENTE, senhas) e no
+# backend.env (segredos da aplicação). Ver README.md.
+#
+#   Cloudflare → :8443 edge-caddy ─┬─ /api, /health → bliq-<amb>-backend:3000 ─► bliq-<amb>-mysql
+#                                  └─ resto         → bliq-<amb>-web:3002
+name: bliq-${AMBIENTE:?defina AMBIENTE no .env}
+
+services:
+  mysql:
+    # Mesma versão do MySQL gerenciado da DigitalOcean de onde o banco veio.
+    image: mysql:8.0.45
+    container_name: bliq-${AMBIENTE}-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: bliq
+      MYSQL_USER: bliq
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:?}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?}
+      TZ: UTC
+    # O banco grava em UTC (ver memória de timezone): fuso do servidor em UTC.
+    command:
+      - --default-time-zone=+00:00
+      - --innodb-buffer-pool-size=256M
+      - --max-connections=60
+      - --skip-name-resolve
+      - --performance-schema=OFF
+    volumes:
+      - ./data/mysql:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p\"$$MYSQL_ROOT_PASSWORD\" --silent"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    mem_limit: 768m
+    networks: [interno]
+
+  backend:
+    build: ./backend
+    image: bliq-backend:${AMBIENTE}
+    container_name: bliq-${AMBIENTE}-backend
+    restart: unless-stopped
+    env_file: backend.env
+    environment:
+      DATABASE_URL: mysql://bliq:${MYSQL_PASSWORD}@mysql:3306/bliq
+      NODE_ENV: production
+      PORT: "3000"
+      LOG_DIR: /var/log/bliq
+      # Faixa da rede `edge`: o IP real do cliente vem do edge-caddy.
+      PROXIES_CONFIAVEIS_EXTRA: 172.20.0.0/16
+    volumes:
+      - ./logs:/var/log/bliq
+    depends_on:
+      mysql:
+        condition: service_healthy
+    mem_limit: 512m
+    logging:
+      driver: json-file
+      options: { max-size: 10m, max-file: "5" }
+    networks: [interno, edge]
+
+  web:
+    build: ./web
+    image: bliq-web:${AMBIENTE}
+    container_name: bliq-${AMBIENTE}-web
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+    mem_limit: 512m
+    networks: [edge]
+
+networks:
+  interno: {}
+  edge:
+    external: true
