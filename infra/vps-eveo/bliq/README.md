@@ -12,7 +12,11 @@ Cloudflare (proxied, Full strict) ─► :8443 edge-caddy ─┬─ /api, /healt
 | Ambiente | Diretório        | Host                         | Estado                         |
 |----------|------------------|------------------------------|--------------------------------|
 | staging  | `~/bliq/staging` | `staging.bliqbrasil.com.br`  | no ar desde 2026-11-24         |
-| prod     | `~/bliq/prod`    | `app.bliqbrasil.com.br`      | a criar (hoje: 192.241.151.11) |
+| prod     | `~/bliq/prod`    | `app.bliqbrasil.com.br`      | **produção desde 2026-11-24 23:54 UTC** |
+
+Backup de produção: cron 04:30 UTC (`scripts/backup.sh`, 14 dias em `backups/`).
+Servidor antigo `root@192.241.151.11`: PM2 parado (rollback, ver `/root/BLIQ-MIGRADA.txt`);
+MySQL gerenciado da DigitalOcean congelado no dump da virada.
 
 ## Arquivos
 
@@ -58,7 +62,12 @@ aceita o droplet antigo. O dump sai de lá direto para a VPS:
 ver o histórico da sessão de 2026-11-24 (mysqldump `--single-transaction
 --set-gtid-purged=OFF --no-tablespaces` a partir de `/var/www/bliq/backend/.env`).
 
-## Virada de produção (resumo)
+## Virada de produção (feita em 2026-11-24, roteiro para referência)
+
+Na Cloudflare do `app`: registro A → VPS, Regra de Origem → 8443 e **Regra de
+Redirecionamento** `(http.host eq "<host>" and not ssl)` → 301 para https (a
+Configuration Rule não faz esse redirecionamento; sem ele o HTTP dá 400).
+
 
 1. Criar `~/bliq/prod` com `AMBIENTE=prod`, `JWT_SECRET` **idêntico** ao do
    servidor antigo, `CORS_ORIGIN=https://app.bliqbrasil.com.br`, sem limite do assistente.
